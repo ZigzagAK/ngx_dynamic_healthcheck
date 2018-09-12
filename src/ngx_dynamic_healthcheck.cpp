@@ -1,0 +1,163 @@
+/*
+ * Copyright (C) 2018 Aleksei Konovkin (alkon2000@mail.ru)
+ */
+
+extern "C" {
+#include <ngx_http.h>
+}
+
+#include <new>
+
+#include "ngx_dynamic_healthcheck_api.h"
+#include "ngx_dynamic_healthcheck_state.h"
+#include "ngx_dynamic_healthcheck_tcp.h"
+#include "ngx_dynamic_healthcheck_http.h"
+#include "ngx_dynamic_healthcheck_ssl.h"
+
+static ngx_event_t event;
+static ngx_connection_t dumb_conn;
+
+
+struct ngx_dynamic_init {
+    ngx_dynamic_init()
+    {
+        ngx_memzero(&event, sizeof(ngx_event_t));
+        ngx_memzero(&dumb_conn, sizeof(ngx_connection_t));
+        dumb_conn.fd = -1;
+    }
+};
+static ngx_dynamic_init init;
+
+
+static void
+ngx_dynamic_healthcheck_refresh_timers(ngx_event_t *ev)
+{
+    if (ngx_exiting || ngx_terminate || ngx_quit)
+        return;
+
+    ngx_dynamic_healthcheck_api<ngx_http_upstream_main_conf_t,
+        ngx_http_upstream_srv_conf_t>::refresh_timers(ev->log);
+    ngx_dynamic_healthcheck_api<ngx_stream_upstream_main_conf_t,
+        ngx_stream_upstream_srv_conf_t>::refresh_timers(ev->log);
+
+    ngx_add_timer(ev, 1000);
+}
+
+
+ngx_int_t
+ngx_dynamic_healthcheck_init_worker(ngx_cycle_t *cycle)
+{
+    if (ngx_process != NGX_PROCESS_WORKER && ngx_process != NGX_PROCESS_SINGLE)
+        return NGX_OK;
+
+    if (event.data != NULL)
+        return NGX_OK;
+
+    event.log = cycle->log;
+    event.handler = ngx_dynamic_healthcheck_refresh_timers;
+    event.data = &dumb_conn;
+
+    ngx_add_timer(&event, 0);
+
+    return NGX_OK;
+}
+
+
+template <class S, class PeersT, class PeerT> ngx_int_t
+do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
+{
+    PeerT                        *peer;
+    PeersT                       *primary, *peers;
+    ngx_uint_t                    i;
+    void                         *addr;
+    ngx_dynamic_hc_state_node_t  *state;
+    ngx_dynamic_healthcheck_peer *p;
+    ngx_str_t                     type = event->conf->shared->type;
+    ngx_msec_t                    touched;
+
+    primary = (PeersT *) uscf->peer.data;
+    peers = primary;
+
+    ngx_rwlock_rlock(&primary->rwlock);
+
+    touched = ngx_current_msec;
+    
+    for (i = 0; peers && i < 2; peers = peers->next, i++)
+        for (peer = peers->peer; peer; peer = peer->next) {
+            state = ngx_dynamic_healthcheck_state_get
+                        (&event->conf->shared->state, &peer->name,
+                         peer->sockaddr, peer->socklen,
+                         event->conf->shared->buffer_size);
+            if (state == NULL)
+                goto nomem;
+
+            if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0) {
+                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_tcp<PeerT>),
+                                  event->log);
+            } else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0) {
+                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_http<PeerT>),
+                                  event->log);
+            } else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0) {
+                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_ssl<PeerT>),
+                                  event->log);
+            } else
+                goto end;
+
+            if (addr == NULL) {
+                ngx_dynamic_healthcheck_state_delete(state);
+                goto nomem;
+            }
+
+            if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0) {
+                p = new (addr)
+                    ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, state);
+            } else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0) {
+                p = new (addr)
+                    ngx_dynamic_healthcheck_http<PeerT>(peer, event, state);
+            } else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0) {
+                p = new (addr)
+                    ngx_dynamic_healthcheck_ssl<PeerT>(peer, event, state);
+            } else
+                p = NULL;
+
+            if (p != NULL)
+                p->check();
+        }
+
+    ngx_dynamic_healthcheck_state_gc(&event->conf->shared->state, touched);
+
+end:
+
+    ngx_rwlock_unlock(&primary->rwlock);
+
+    return NGX_OK;
+
+nomem:
+
+    ngx_rwlock_unlock(&primary->rwlock);
+
+    ngx_log_error(NGX_LOG_ERR, event->log, 0,
+                  "[%V] no memory", &event->conf->shared->module);
+
+    return NGX_ERROR;
+}
+
+
+ngx_int_t
+ngx_dynamic_event_handler_base::do_check(ngx_http_upstream_srv_conf_t *uscf,
+    ngx_dynamic_healthcheck_event_t *event)
+{
+    return do_check_private<ngx_http_upstream_srv_conf_t,
+                            ngx_http_upstream_rr_peers_t,
+                            ngx_http_upstream_rr_peer_t>(uscf, event);
+}
+
+
+ngx_int_t
+ngx_dynamic_event_handler_base::do_check(ngx_stream_upstream_srv_conf_t *uscf,
+    ngx_dynamic_healthcheck_event_t *event)
+{
+    return do_check_private<ngx_stream_upstream_srv_conf_t,
+                            ngx_stream_upstream_rr_peers_t,
+                            ngx_stream_upstream_rr_peer_t>(uscf, event);
+}
