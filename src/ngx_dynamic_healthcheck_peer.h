@@ -63,6 +63,9 @@ private:
     post_checks(ngx_event_t *ev);
 
     void
+    abort();
+
+    void
     fail(ngx_flag_t skip = 0);
 
     void

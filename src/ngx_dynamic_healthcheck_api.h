@@ -505,7 +505,7 @@ public:
         ngx_dynamic_healthcheck_conf_t   *conf;
         ngx_dynamic_healthcheck_event_t  *event;
         ngx_msec_t                        now;
-        ngx_time_t                       *tp = ngx_timeofday();
+        ngx_time_t                       *tp;
         ngx_core_conf_t                  *ccf;
         ngx_flag_t                        persistent;
 
@@ -517,6 +517,10 @@ public:
             return;
 
         uscf = (S **) umcf->upstreams.elts;
+
+        ngx_time_update();
+
+        tp = ngx_timeofday();
 
         now = tp->sec * 1000 + tp->msec;
         
@@ -535,7 +539,7 @@ public:
             if (conf->shared->type.len == 0)
                 goto next;
 
-            if (conf->shared->event.data != NULL) {
+            if (conf->event.data != NULL) {
                 conf->shared->last = now;
                 goto next;
             }
@@ -559,7 +563,7 @@ public:
 
             conf->shared->state.pid = ngx_pid;
 
-            ngx_memzero(&conf->shared->event, sizeof(ngx_event_t));
+            ngx_memzero(&conf->event, sizeof(ngx_event_t));
 
             event = (ngx_dynamic_healthcheck_event_t *)
                 ngx_calloc(sizeof(ngx_dynamic_healthcheck_event_t), log);
@@ -574,16 +578,16 @@ public:
             event->conf = conf;
             event->completed = &ngx_dynamic_healthcheck_api<M, S>::on_completed;
 
-            conf->shared->event.log = log;
-            conf->shared->event.data = (void *) event;
-            conf->shared->event.handler = &ngx_dynamic_event_handler<S>::check;
+            conf->event.log = log;
+            conf->event.data = (void *) event;
+            conf->event.handler = &ngx_dynamic_event_handler<S>::check;
 
             conf->shared->last = now;
 
-            ngx_add_timer(&conf->shared->event, 0);
+            ngx_add_timer(&conf->event, 0);
 
 next:
-            
+
             ngx_shmtx_unlock(&conf->shared->state.slab->mutex);
         }
     }

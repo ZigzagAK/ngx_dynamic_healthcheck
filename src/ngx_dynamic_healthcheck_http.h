@@ -329,7 +329,7 @@ well_done:
 
         switch (ngx_http_parse_status_line(&r, &state->buf, &status)) {
             case NGX_OK:
-                ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
                                "[%V] %V: %V addr=%V, "
                                "fd=%d http on_recv() status: %d",
                                &this->module, &this->upstream,
@@ -358,7 +358,7 @@ well_done:
         for (;;) {
             rc = ngx_http_read_header(&r, &state->buf, &h);
 
-            ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
+            ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
                            "[%V] %V: %V addr=%V, fd=%d http"
                            " on_recv() ngx_http_read_header, rc=%d",
                            &this->module, &this->upstream,
@@ -372,7 +372,7 @@ well_done:
                 if (ngx_strcmp(h.key.data, "transfer-encoding") == 0)
                     chunked = ngx_strcmp(h.value.data, "chunked") == 0;
 
-                ngx_log_debug7(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                ngx_log_debug7(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
                                "[%V] %V: %V addr=%V, "
                                "fd=%d http on_recv() header: %V=%V",
                                &this->module, &this->upstream,

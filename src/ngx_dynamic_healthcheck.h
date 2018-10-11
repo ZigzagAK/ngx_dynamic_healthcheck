@@ -67,7 +67,6 @@ struct ngx_dynamic_healthcheck_opts_s {
     size_t                 buffer_size;
     ngx_msec_t             last;
     ngx_dynamic_hc_state_t state;
-    ngx_event_t            event;
     ngx_str_t              persistent;
     ngx_flag_t             updated;
     ngx_int_t              loaded;
@@ -86,6 +85,7 @@ typedef void (*ngx_shm_zone_post_init_pt)
 struct ngx_dynamic_healthcheck_conf_s {
     ngx_dynamic_healthcheck_opts_t  config;
     ngx_dynamic_healthcheck_opts_t *shared;
+    ngx_event_t                     event;
     ngx_shm_zone_t                 *zone;
     ngx_shm_zone_post_init_pt       post_init;
     void                           *uscf;
@@ -141,9 +141,6 @@ public:
     {
         ngx_dynamic_healthcheck_event_t *event;
         S                               *uscf;
-
-        if (ngx_exiting || ngx_terminate || ngx_quit)
-            return;
 
         event = (ngx_dynamic_healthcheck_event_t *) ev->data;
         uscf = (S *) event->uscf;

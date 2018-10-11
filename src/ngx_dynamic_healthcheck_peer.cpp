@@ -94,6 +94,15 @@ ngx_dynamic_healthcheck_peer::post_checks(ngx_event_t *ev)
     return NGX_OK;
 }
 
+
+void
+ngx_dynamic_healthcheck_peer::abort()
+{
+    close();
+    completed();
+}
+
+
 void
 ngx_dynamic_healthcheck_peer::fail(ngx_flag_t skip)
 {
@@ -187,7 +196,7 @@ ngx_dynamic_healthcheck_peer::handle_connect(ngx_event_t *ev)
                        "[%V] %V: %V addr=%V, fd=%d worker stopping, close",
                        &peer->module, &peer->upstream,
                        &peer->server, &peer->name, c->fd);
-        return ngx_close_connection(c);
+        return peer->abort();
     }
 
     if (ev->timedout) {
@@ -243,7 +252,7 @@ ngx_dynamic_healthcheck_peer::handle_write(ngx_event_t *ev)
                        "[%V] %V: %V addr=%V, fd=%d worker stopping, close",
                        &peer->module, &peer->upstream,
                        &peer->server, &peer->name, c->fd);
-        return ngx_close_connection(c);
+        return peer->abort();
     }
 
     if (ev->timedout) {
@@ -330,7 +339,7 @@ ngx_dynamic_healthcheck_peer::handle_read(ngx_event_t *ev)
                        "[%V] %V: %V addr=%V, fd=%d worker stopping, close",
                        &peer->module, &peer->upstream,
                        &peer->server, &peer->name, c->fd);
-        return ngx_close_connection(c);
+        return peer->abort();
     }
 
     if (ev->timedout) {

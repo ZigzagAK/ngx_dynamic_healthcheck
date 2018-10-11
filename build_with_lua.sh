@@ -78,10 +78,10 @@ function build_debug() {
               --with-debug \
               --with-cc-opt="-O0 -D_WITH_LUA_API" \
               --add-module=../ngx_devel_kit \
-              --add-module=../../../ngx_dynamic_healthcheck \
-              --add-module=../ngx_dynamic_upstream \
               --add-module=../lua-nginx-module \
-              --add-module=../stream-lua-nginx-module > /dev/null
+              --add-module=../stream-lua-nginx-module \
+              --add-module=../../../ngx_dynamic_healthcheck \
+              --add-module=../ngx_dynamic_upstream > /dev/null
 
   r=$?
   if [ $r -ne 0 ]; then
@@ -110,10 +110,10 @@ function build_release() {
               --with-cc-opt="-D_WITH_LUA_API" \
               --with-stream \
               --add-module=../ngx_devel_kit \
-              --add-module=../../../ngx_dynamic_healthcheck \
-              --add-module=../ngx_dynamic_upstream \
               --add-module=../lua-nginx-module \
-              --add-module=../stream-lua-nginx-module > /dev/null
+              --add-module=../stream-lua-nginx-module \
+              --add-module=../../../ngx_dynamic_healthcheck \
+              --add-module=../ngx_dynamic_upstream > /dev/null
 
   r=$?
   if [ $r -ne 0 ]; then

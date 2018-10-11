@@ -27,7 +27,12 @@ HTTP_DYNAMIC_HC_DEPS="                                      \
     $ngx_addon_dir/src/ngx_dynamic_shm.h                    \
 "
 
-CORE_INCS="$CORE_INCS $ngx_addon_dir/src"
+stream_lua_nginx_module_incs="$(echo $CORE_INCS | awk '{
+    match($0, /([^ ]*\/stream-lua-nginx-module\/src)/, arr)
+    print arr[1]
+}')"
+CORE_INCS="$CORE_INCS $stream_lua_nginx_module_incs"
+
 
 if test -n "$ngx_module_link"; then
     ngx_module_type=HTTP

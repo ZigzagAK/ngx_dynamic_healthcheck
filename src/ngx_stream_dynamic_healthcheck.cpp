@@ -2,13 +2,15 @@
  * Copyright (C) 2018 Aleksei Konovkin (alkon2000@mail.ru)
  */
 
-typedef void*
-ngx_stream_lua_request_t;
+extern "C" {
+#include <ngx_stream.h>
+}
 
 #ifdef _WITH_LUA_API
 extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
+#include "ngx_stream_lua_request.h"
 #include "ngx_stream_lua_api.h"
 }
 #endif
@@ -139,7 +141,7 @@ ngx_module_t ngx_stream_dynamic_healthcheck_module = {
     NGX_STREAM_MODULE,                           /* module type       */
     NULL,                                        /* init master       */
     NULL,                                        /* init module       */
-    ngx_dynamic_healthcheck_init_worker,         /* init process      */
+    NULL,                                        /* init process      */
     NULL,                                        /* init thread       */
     NULL,                                        /* exit thread       */
     NULL,                                        /* exit process      */

@@ -14,20 +14,6 @@ extern "C" {
 #include "ngx_dynamic_healthcheck_http.h"
 #include "ngx_dynamic_healthcheck_ssl.h"
 
-static ngx_event_t event;
-static ngx_connection_t dumb_conn;
-
-
-struct ngx_dynamic_init {
-    ngx_dynamic_init()
-    {
-        ngx_memzero(&event, sizeof(ngx_event_t));
-        ngx_memzero(&dumb_conn, sizeof(ngx_connection_t));
-        dumb_conn.fd = -1;
-    }
-};
-static ngx_dynamic_init init;
-
 
 static void
 ngx_dynamic_healthcheck_refresh_timers(ngx_event_t *ev)
@@ -50,14 +36,21 @@ ngx_dynamic_healthcheck_init_worker(ngx_cycle_t *cycle)
     if (ngx_process != NGX_PROCESS_WORKER && ngx_process != NGX_PROCESS_SINGLE)
         return NGX_OK;
 
-    if (event.data != NULL)
-        return NGX_OK;
+    ngx_event_t *event = (ngx_event_t *) ngx_pcalloc(cycle->pool,
+        sizeof(ngx_event_t));
+    ngx_connection_t *dumb_conn = (ngx_connection_t *) ngx_pcalloc(cycle->pool,
+        sizeof(ngx_connection_t));
 
-    event.log = cycle->log;
-    event.handler = ngx_dynamic_healthcheck_refresh_timers;
-    event.data = &dumb_conn;
+    if (event == NULL || dumb_conn == NULL)
+        return NGX_ERROR;
 
-    ngx_add_timer(&event, 0);
+    dumb_conn->fd = -1;
+
+    event->log = cycle->log;
+    event->handler = ngx_dynamic_healthcheck_refresh_timers;
+    event->data = dumb_conn;
+
+    ngx_post_event(event, &ngx_posted_events);
 
     return NGX_OK;
 }
