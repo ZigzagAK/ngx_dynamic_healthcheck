@@ -73,6 +73,7 @@ __DATA__
     }
     location /test {
         content_by_lua_block {
+            ngx.sleep(1)
             local resp = assert(ngx.location.capture("/status"))
             if resp.status ~= ngx.HTTP_OK then
               ngx.say(resp.status)
@@ -169,6 +170,7 @@ u2 127.0.0.6:6006 1 0
     }
     location /test {
         content_by_lua_block {
+            ngx.sleep(1)
             local resp = assert(ngx.location.capture("/status?stream="))
             if resp.status ~= ngx.HTTP_OK then
               ngx.say(resp.status)

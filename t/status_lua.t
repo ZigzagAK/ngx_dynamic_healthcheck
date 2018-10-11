@@ -70,6 +70,7 @@ __DATA__
 --- config
     location /test {
         content_by_lua_block {
+            ngx.sleep(1)
             local hc = require "ngx.healthcheck"
             ngx.sleep(1)
             local data, err = hc.status()
@@ -163,6 +164,7 @@ u2 127.0.0.6:6006 1 0
 --- config
     location /test {
         content_by_lua_block {
+            ngx.sleep(1)
             local hc = require "ngx.healthcheck.stream"
             ngx.sleep(1)
             local data, err = hc.status()
