@@ -625,8 +625,8 @@ ngx_dynamic_healthcheck_peer::check()
 
     if (name.len >= skip_addr.len
         && ngx_memcmp(name.data, skip_addr.data, skip_addr.len) == 0) {
-        state->fall = shared->fall;
-        return fail(1);
+        down();
+        return completed();
     }
 
     for (j = 0; j < 2; j++) {
@@ -650,8 +650,12 @@ disabled:
                    "[%V] %V: %V addr=%V disabled",
                    &module, &upstream, &server, &name);
 
-    state->fall = shared->fall;
-    fail();
+    close();
+    down();
+
+    this->~ngx_dynamic_healthcheck_peer();
+
+    ngx_free(this);
 }
 
 
