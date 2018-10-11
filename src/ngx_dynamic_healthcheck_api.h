@@ -602,7 +602,9 @@ private:
         if (event->conf->config.persistent.len != 0
             && ngx_strcmp(event->conf->config.persistent.data, "off") != 0)
             ngx_dynamic_healthcheck_api_base::save(event->conf, event->log);
-                
+        else
+            event->conf->shared->updated = 0;
+
         ngx_shmtx_unlock(&event->conf->shared->state.slab->mutex);
     }
 };
