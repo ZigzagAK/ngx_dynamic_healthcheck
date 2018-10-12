@@ -11,7 +11,7 @@ build_deps=0
 
 DIR="$(pwd)"
 
-VERSION="1.13.6"
+VERSION="1.13.12"
 PCRE_VERSION="8.39"
 ZLIB_VERSION="1.2.11"
 
