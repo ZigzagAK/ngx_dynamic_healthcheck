@@ -63,7 +63,7 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
     PeersT                       *primary, *peers;
     ngx_uint_t                    i;
     void                         *addr;
-    ngx_dynamic_hc_state_node_t  *state;
+    ngx_dynamic_hc_state_node_t   state;
     ngx_dynamic_healthcheck_peer *p;
     ngx_str_t                     type = event->conf->shared->type;
     ngx_msec_t                    touched;
@@ -78,10 +78,10 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
     for (i = 0; peers && i < 2; peers = peers->next, i++)
         for (peer = peers->peer; peer; peer = peer->next) {
             state = ngx_dynamic_healthcheck_state_get
-                        (&event->conf->shared->state, &peer->name,
+                        (&event->conf->state, &peer->name,
                          peer->sockaddr, peer->socklen,
                          event->conf->shared->buffer_size);
-            if (state == NULL)
+            if (state.local == NULL)
                 goto nomem;
 
             if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0) {
@@ -117,7 +117,7 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
                 p->check();
         }
 
-    ngx_dynamic_healthcheck_state_gc(&event->conf->shared->state, touched);
+    ngx_dynamic_healthcheck_state_gc(&event->conf->shared->shared, touched);
 
 end:
 

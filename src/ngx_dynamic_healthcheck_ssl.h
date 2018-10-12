@@ -96,8 +96,8 @@ protected:
         s.data = (u_char *) sslv3_client_hello_pkt;
         s.len = sizeof(sslv3_client_hello_pkt);
 
-        state->buf.last = ngx_snprintf(state->buf.start,
-            state->buf.end - state->buf.start, "%V", &s);
+        state->local->buf->last = ngx_snprintf(state->local->buf->start,
+            state->local->buf->end - state->local->buf->start, "%V", &s);
 
         return NGX_OK;
     }
@@ -105,7 +105,7 @@ protected:
     virtual ngx_int_t
     on_send(ngx_dynamic_hc_state_node_t *state)
     {
-        if (state->buf.last == state->buf.start)
+        if (state->local->buf->last == state->local->buf->start)
             if (make_request(state) == NGX_ERROR)
                 return NGX_ERROR;
 
@@ -115,8 +115,8 @@ protected:
     virtual ngx_int_t
     on_recv(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_buf_t               *buf = &state->buf;
-        ngx_connection_t        *c = state->pc.connection;
+        ngx_buf_t               *buf = state->local->buf;
+        ngx_connection_t        *c = state->local->pc.connection;
         ssize_t                  size;
         ngx_ssl_server_hello_t  *hello;
 
@@ -166,7 +166,7 @@ protected:
 public:
 
     ngx_dynamic_healthcheck_ssl(PeerT *peer,
-        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t *s)
+        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
         : ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, s)
     {}
 };

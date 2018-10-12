@@ -27,38 +27,36 @@ protected:
     ngx_int_t
     make_request(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_connection_t                *c = state->pc.connection;
+        ngx_buf_t                       *buf = state->local->buf;
+        ngx_connection_t                *c = state->local->pc.connection;
         ngx_uint_t                       i;
         ngx_dynamic_healthcheck_opts_t  *shared = this->shared;
 
-        state->buf.last = ngx_snprintf(state->buf.last, shared->buffer_size,
-           "%V %V HTTP/1.%s\r\n"
-           "Host: %V\r\n"
-           "User-Agent: nginx/"NGINX_VERSION"\r\n"
-           "Connection: %s\r\n",
-           &shared->request_method,
-           &shared->request_uri,
-           shared->keepalive > c->requests + 1 ? "1" : "0",
-           &state->name.str,
-           shared->keepalive > c->requests + 1 ? "keep-alive" : "close");
+        buf->last = ngx_snprintf(buf->last, shared->buffer_size,
+            "%V %V HTTP/1.%s\r\n"
+            "Host: %V\r\n"
+            "User-Agent: nginx/"NGINX_VERSION"\r\n"
+            "Connection: %s\r\n",
+            &shared->request_method,
+            &shared->request_uri,
+            shared->keepalive > c->requests + 1 ? "1" : "0",
+            &state->local->name.str,
+            shared->keepalive > c->requests + 1 ? "keep-alive" : "close");
 
         for (i = 0; i < shared->request_headers.len; i++)
-            state->buf.last = ngx_snprintf(state->buf.last,
-                state->buf.end - state->buf.last,
+            buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
                 "%V: %V\r\n",
                 &shared->request_headers.data[i].key,
                 &shared->request_headers.data[i].value);
 
         if (shared->request_body.len)
-            state->buf.last = ngx_snprintf(state->buf.last,
-                state->buf.end - state->buf.last,
+            buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
                 "Content-Length: %d\r\n\r\n%V",
                 shared->request_body.len, &shared->request_body);
         else
-            state->buf.last = ngx_snprintf(state->buf.last,
-                state->buf.end - state->buf.last, "\r\n");
+            buf->last = ngx_snprintf(buf->last, buf->end - buf->last, "\r\n");
 
-        if (state->buf.last == state->buf.end) {
+        if (buf->last == buf->end) {
             ngx_log_error(NGX_LOG_WARN, c->log, 0,
                           "[%V] %V: %V addr=%V, fd=%d http "
                           "healthcheck_buffer_size too small for the request",
@@ -76,7 +74,7 @@ protected:
         if (this->event->conf->shared->request_uri.len == 0)
             goto tcp;
 
-        if (state->buf.last == state->buf.start)
+        if (state->local->buf->last == state->local->buf->start)
             if (make_request(state) == NGX_ERROR)
                 return NGX_ERROR;
 
@@ -88,11 +86,11 @@ tcp:
     virtual ngx_int_t
     on_recv(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_connection_t                *c = state->pc.connection;
+        ngx_connection_t                *c = state->local->pc.connection;
         ngx_uint_t                       i;
         ngx_dynamic_healthcheck_opts_t  *shared = this->shared;
 
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
+        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->local->pc.connection->log, 0,
                        "[%V] %V: %V addr=%V, fd=%d http on_recv() %s",
                        &this->module, &this->upstream,
                        &this->server, &this->name, c->fd,
@@ -221,7 +219,8 @@ recv_body:
 well_done:
 
         if (body.start != NULL) {
-            ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
+            ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
+                           state->local->pc.connection->log, 0,
                            "[%V] %V: %V addr=%V, fd=%d "
                            "http on_recv() body:\n%s",
                            &this->module, &this->upstream,
@@ -285,8 +284,8 @@ well_done:
     ngx_int_t
     receive_buf(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_connection_t  *c = state->pc.connection;
-        ngx_buf_t         *buf = &state->buf;
+        ngx_connection_t  *c = state->local->pc.connection;
+        ngx_buf_t         *buf = state->local->buf;
         ssize_t            size;
 
         if (content_length > buf->end - buf->last) {
@@ -327,14 +326,15 @@ well_done:
         if (status.code != 0)
             return NGX_OK;
 
-        switch (ngx_http_parse_status_line(&r, &state->buf, &status)) {
+        switch (ngx_http_parse_status_line(&r, state->local->buf, &status)) {
             case NGX_OK:
-                ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
+                ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
+                               state->local->pc.connection->log, 0,
                                "[%V] %V: %V addr=%V, "
                                "fd=%d http on_recv() status: %d",
                                &this->module, &this->upstream,
                                &this->server, &this->name,
-                               state->pc.connection->fd,
+                               state->local->pc.connection->fd,
                                status.code);
                 break;
 
@@ -356,14 +356,15 @@ well_done:
         ngx_int_t          rc;
 
         for (;;) {
-            rc = ngx_http_read_header(&r, &state->buf, &h);
+            rc = ngx_http_read_header(&r, state->local->buf, &h);
 
-            ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
+            ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
+                           state->local->pc.connection->log, 0,
                            "[%V] %V: %V addr=%V, fd=%d http"
                            " on_recv() ngx_http_read_header, rc=%d",
                            &this->module, &this->upstream,
                            &this->server, &this->name,
-                           state->pc.connection->fd, rc);
+                           state->local->pc.connection->fd, rc);
 
             if (rc == NGX_OK) {
                 if (ngx_strcmp(h.key.data, "content-length") == 0)
@@ -372,12 +373,13 @@ well_done:
                 if (ngx_strcmp(h.key.data, "transfer-encoding") == 0)
                     chunked = ngx_strcmp(h.value.data, "chunked") == 0;
 
-                ngx_log_debug7(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
+                ngx_log_debug7(NGX_LOG_DEBUG_HTTP,
+                               state->local->pc.connection->log, 0,
                                "[%V] %V: %V addr=%V, "
                                "fd=%d http on_recv() header: %V=%V",
                                &this->module, &this->upstream,
                                &this->server, &this->name,
-                               state->pc.connection->fd,
+                               state->local->pc.connection->fd,
                                &h.key, &h.value);
                 continue;
             }
@@ -400,10 +402,10 @@ well_done:
     ngx_int_t
     receive_body(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_connection_t  *c = state->pc.connection;
+        ngx_connection_t  *c = state->local->pc.connection;
         ssize_t            size;
         u_char            *sep;
-        ngx_buf_t         *buf = &state->buf;
+        ngx_buf_t         *buf = state->local->buf;
 
         if (chunked) {
 
@@ -490,7 +492,7 @@ again:
 public:
 
     ngx_dynamic_healthcheck_http(PeerT *peer,
-        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t *s)
+        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
         : ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, s),
           content_length(0), chunked(0), pool(NULL)
     {

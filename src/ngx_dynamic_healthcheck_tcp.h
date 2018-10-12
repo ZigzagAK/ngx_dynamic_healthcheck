@@ -19,8 +19,8 @@ protected:
     virtual ngx_int_t
     on_send(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_buf_t         *buf = &state->buf;
-        ngx_connection_t  *c = state->pc.connection;
+        ngx_buf_t         *buf = state->local->buf;
+        ngx_connection_t  *c = state->local->pc.connection;
         ssize_t            size;
 #if (NGX_DEBUG)
         ngx_str_t          tmp;
@@ -30,8 +30,8 @@ protected:
             return NGX_DECLINED;
 
         if (buf->last == buf->start)
-            state->buf.last = ngx_snprintf(state->buf.last, shared->buffer_size,
-                                           "%V", &shared->request_body);
+            buf->last = ngx_snprintf(buf->last, shared->buffer_size,
+                                     "%V", &shared->request_body);
 
         size = c->send(c, buf->pos, buf->last - buf->pos);
 
@@ -61,8 +61,8 @@ protected:
     virtual ngx_int_t
     on_recv(ngx_dynamic_hc_state_node_t *state)
     {
-        ngx_buf_t         *buf = &state->buf;
-        ngx_connection_t  *c = state->pc.connection;
+        ngx_buf_t         *buf = state->local->buf;
+        ngx_connection_t  *c = state->local->pc.connection;
         ssize_t            size;
         ngx_str_t          s;
 
@@ -137,7 +137,7 @@ protected:
 public:
 
     ngx_dynamic_healthcheck_tcp(PeerT *peer,
-        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t *s)
+        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
         : ngx_dynamic_healthcheck_peer_wrap<PeerT>(peer, event, s)
     {
         shared = event->conf->shared;

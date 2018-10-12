@@ -534,7 +534,7 @@ public:
 
             conf = get_srv_conf(uscf[i]);
 
-            ngx_shmtx_lock(&conf->shared->state.slab->mutex);
+            ngx_shmtx_lock(&conf->shared->shared.slab->mutex);
 
             if (conf->shared->type.len == 0)
                 goto next;
@@ -561,14 +561,12 @@ public:
                 goto next;
             }
 
-            conf->shared->state.pid = ngx_pid;
-
             ngx_memzero(&conf->event, sizeof(ngx_event_t));
 
             event = (ngx_dynamic_healthcheck_event_t *)
                 ngx_calloc(sizeof(ngx_dynamic_healthcheck_event_t), log);
             if (event == NULL) {
-                ngx_shmtx_unlock(&conf->shared->state.slab->mutex);
+                ngx_shmtx_unlock(&conf->shared->shared.slab->mutex);
                 ngx_log_error(NGX_LOG_ERR, log, 0, "healthcheck: no memory");
                 return;
             }
@@ -588,7 +586,7 @@ public:
 
 next:
 
-            ngx_shmtx_unlock(&conf->shared->state.slab->mutex);
+            ngx_shmtx_unlock(&conf->shared->shared.slab->mutex);
         }
     }
 
@@ -597,7 +595,7 @@ private:
     static void
     on_completed(ngx_dynamic_healthcheck_event_t *event)
     {
-        ngx_shmtx_lock(&event->conf->shared->state.slab->mutex);
+        ngx_shmtx_lock(&event->conf->shared->shared.slab->mutex);
 
         if (event->conf->config.persistent.len != 0
             && ngx_strcmp(event->conf->config.persistent.data, "off") != 0)
@@ -605,7 +603,7 @@ private:
         else
             event->conf->shared->updated = 0;
 
-        ngx_shmtx_unlock(&event->conf->shared->state.slab->mutex);
+        ngx_shmtx_unlock(&event->conf->shared->shared.slab->mutex);
     }
 };
 

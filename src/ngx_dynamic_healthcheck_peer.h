@@ -20,7 +20,7 @@ class ngx_dynamic_healthcheck_peer
 private:
 
     ngx_dynamic_healthcheck_opts_t   *shared;
-    ngx_dynamic_hc_state_node_t      *state;
+    ngx_dynamic_hc_state_node_t       state;
 
     typedef enum {
         st_none,
@@ -103,7 +103,7 @@ protected:
 public:
 
     ngx_dynamic_healthcheck_peer(ngx_dynamic_healthcheck_event_t *ev,
-        ngx_dynamic_hc_state_node_t *s);
+        ngx_dynamic_hc_state_node_t s);
 
     void
     check();
@@ -150,7 +150,7 @@ protected:
 public:
 
     ngx_dynamic_healthcheck_peer_wrap(PeerT *p,
-        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t *s)
+        ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
         : ngx_dynamic_healthcheck_peer(event, s), peer(p)
     {
         ngx_rwlock_wlock(&peer->lock);
