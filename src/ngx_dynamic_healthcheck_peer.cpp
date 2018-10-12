@@ -631,13 +631,13 @@ ngx_dynamic_healthcheck_peer::check()
 
     for (j = 0; j < 2; j++) {
         for (i = 0; i < hosts[j].len; i++) {
-            if (name.len == hosts[j].data[i].len &&
+            if (name.len >= hosts[j].data[i].len &&
                 ngx_memcmp(name.data, hosts[j].data[i].data,
-                           name.len) == 0)
+                           hosts[j].data[i].len) == 0)
                 goto disabled;
-            if (server.len == hosts[j].data[i].len &&
+            if (server.len >= hosts[j].data[i].len &&
                 ngx_memcmp(server.data, hosts[j].data[i].data,
-                           server.len) == 0)
+                           hosts[j].data[i].len) == 0)
                 goto disabled;
         }
     }
