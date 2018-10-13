@@ -311,7 +311,7 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
 
         slab->data = sh;
 
-        ngx_rbtree_init(&sh->shared.rbtree, &sh->shared.sentinel,
+        ngx_rbtree_init(&sh->state.rbtree, &sh->state.sentinel,
                         ngx_str_rbtree_insert_value);
     }
 
@@ -347,12 +347,12 @@ skip:
                                               &opts->disabled_hosts_global,
                                               slab);
 
-    conf->state.shared = &sh->shared;
+    conf->peers.shared = &sh->state;
 
-    ngx_rbtree_init(&conf->state.local.rbtree, &conf->state.local.sentinel,
+    ngx_rbtree_init(&conf->peers.local.rbtree, &conf->peers.local.sentinel,
                     ngx_str_rbtree_insert_value);
 
-    sh->shared.slab = slab;
+    sh->state.slab = slab;
     sh->buffer_size = opts->buffer_size;
 
     ngx_shmtx_unlock(&slab->mutex);

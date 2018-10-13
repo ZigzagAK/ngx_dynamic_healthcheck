@@ -35,6 +35,7 @@ typedef struct {
     ngx_dynamic_hc_local_t         local;
 } ngx_dynamic_hc_state_t;
 
+
 typedef struct {
     ngx_str_node_t                 name;
 
@@ -55,6 +56,7 @@ typedef struct {
     ngx_str_t                      module;
     ngx_str_t                      upstream;
 
+    ngx_str_t                      server;
     struct sockaddr               *sockaddr;
     socklen_t                      socklen;
 
@@ -85,8 +87,8 @@ typedef struct ngx_dynamic_hc_stat_s {
 
 ngx_dynamic_hc_state_node_t
 ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
-    ngx_str_t *name, struct sockaddr *sockaddr, socklen_t socklen,
-    size_t buffer_size);
+    ngx_str_t *server, ngx_str_t *name,
+    struct sockaddr *sockaddr, socklen_t socklen, size_t buffer_size);
 
 
 ngx_int_t

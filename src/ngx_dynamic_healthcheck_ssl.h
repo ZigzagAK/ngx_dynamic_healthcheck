@@ -82,7 +82,7 @@ template <class PeerT> class ngx_dynamic_healthcheck_ssl :
 protected:
 
     ngx_int_t
-    make_request(ngx_dynamic_hc_state_node_t *state)
+    make_request(ngx_dynamic_hc_local_node_t *state)
     {
         static char  alphabet[] = "1234567890abcdefghijklmnopqrstuvwxyz";
 
@@ -96,16 +96,16 @@ protected:
         s.data = (u_char *) sslv3_client_hello_pkt;
         s.len = sizeof(sslv3_client_hello_pkt);
 
-        state->local->buf->last = ngx_snprintf(state->local->buf->start,
-            state->local->buf->end - state->local->buf->start, "%V", &s);
+        state->buf->last = ngx_snprintf(state->buf->start,
+            state->buf->end - state->buf->start, "%V", &s);
 
         return NGX_OK;
     }
 
     virtual ngx_int_t
-    on_send(ngx_dynamic_hc_state_node_t *state)
+    on_send(ngx_dynamic_hc_local_node_t *state)
     {
-        if (state->local->buf->last == state->local->buf->start)
+        if (state->buf->last == state->buf->start)
             if (make_request(state) == NGX_ERROR)
                 return NGX_ERROR;
 
@@ -113,10 +113,10 @@ protected:
     }
 
     virtual ngx_int_t
-    on_recv(ngx_dynamic_hc_state_node_t *state)
+    on_recv(ngx_dynamic_hc_local_node_t *state)
     {
-        ngx_buf_t               *buf = state->local->buf;
-        ngx_connection_t        *c = state->local->pc.connection;
+        ngx_buf_t               *buf = state->buf;
+        ngx_connection_t        *c = state->pc.connection;
         ssize_t                  size;
         ngx_ssl_server_hello_t  *hello;
 

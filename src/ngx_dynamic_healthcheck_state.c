@@ -9,10 +9,10 @@ ngx_int_t
 ngx_dynamic_healthcheck_state_stat(ngx_dynamic_hc_state_t *state,
     ngx_str_t *name, ngx_dynamic_hc_stat_t *stat)
 {
-    ngx_dynamic_hc_shared_node_t   *shared;
-    uint32_t                        hash;
-    ngx_rbtree_t                   *rbtree = &state->shared->rbtree;
-    ngx_slab_pool_t                *slab = state->shared->slab;
+    ngx_dynamic_hc_shared_node_t  *shared;
+    uint32_t                       hash;
+    ngx_rbtree_t                  *rbtree = &state->shared->rbtree;
+    ngx_slab_pool_t               *slab = state->shared->slab;
 
     hash = ngx_crc32_short(name->data, name->len);
 
@@ -41,8 +41,8 @@ ngx_dynamic_healthcheck_state_stat(ngx_dynamic_hc_state_t *state,
 
 
 static ngx_dynamic_hc_local_node_t *
-ngx_dynamic_healthcheck_create_local(ngx_str_t *name, size_t buffer_size,
-    struct sockaddr *sockaddr, socklen_t socklen)
+ngx_dynamic_healthcheck_create_local(ngx_str_t *server, ngx_str_t *name,
+    size_t buffer_size, struct sockaddr *sockaddr, socklen_t socklen)
 {
     ngx_pool_t                   *pool;
     ngx_dynamic_hc_local_node_t  *n;
@@ -56,6 +56,13 @@ ngx_dynamic_healthcheck_create_local(ngx_str_t *name, size_t buffer_size,
         goto nomem;
 
     n->pool = pool;
+
+    n->server.data = ngx_pcalloc(pool, server->len);
+    if (n->server.data == NULL)
+        goto nomem;
+
+    ngx_memcpy(n->server.data, server->data, server->len);
+    n->server.len = server->len;
 
     n->name.str.data = ngx_pcalloc(pool, name->len);
     if (n->name.str.data == NULL)
@@ -86,8 +93,8 @@ nomem:
 
 ngx_dynamic_hc_state_node_t
 ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
-    ngx_str_t *name, struct sockaddr *sockaddr, socklen_t socklen,
-    size_t buffer_size)
+    ngx_str_t *server, ngx_str_t *name,
+    struct sockaddr *sockaddr, socklen_t socklen, size_t buffer_size)
 {
     ngx_dynamic_hc_state_node_t   n;
     ngx_rbtree_node_t            *node;
@@ -124,7 +131,8 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
                 goto done;
         }
 
-        n.local = ngx_dynamic_healthcheck_create_local(name, buffer_size,
+        n.local = ngx_dynamic_healthcheck_create_local(server, name,
+                                                       buffer_size,
                                                        sockaddr, socklen);
         if (n.local == NULL)
             goto done;
@@ -158,7 +166,8 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
 
     // alloc worker local
 
-    n.local = ngx_dynamic_healthcheck_create_local(name, buffer_size,
+    n.local = ngx_dynamic_healthcheck_create_local(server, name,
+                                                   buffer_size,
                                                    sockaddr, socklen);
     if (n.local == NULL) {
         nomem = 1;
@@ -207,7 +216,7 @@ done:
 void
 ngx_dynamic_healthcheck_state_delete(ngx_dynamic_hc_state_node_t state)
 {
-    ngx_slab_pool_t *slab = state.shared->state->slab;
+    ngx_slab_pool_t  *slab = state.shared->state->slab;
 
     ngx_shmtx_lock(&slab->mutex);
 
@@ -233,10 +242,10 @@ void
 ngx_dynamic_healthcheck_state_gc(ngx_dynamic_hc_shared_t *state,
     ngx_msec_t touched)
 {
-    ngx_dynamic_hc_shared_node_t   *n;
-    ngx_rbtree_node_t              *node, *root, *sentinel;
-    ngx_slab_pool_t                *slab = state->slab;
-    ngx_dynamic_hc_state_node_t     del;
+    ngx_dynamic_hc_shared_node_t  *n;
+    ngx_rbtree_node_t             *node, *root, *sentinel;
+    ngx_slab_pool_t               *slab = state->slab;
+    ngx_dynamic_hc_state_node_t    del;
 
     del.local = NULL;
 

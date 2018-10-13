@@ -50,7 +50,7 @@ ngx_dynamic_healthcheck_init_worker(ngx_cycle_t *cycle)
     event->handler = ngx_dynamic_healthcheck_refresh_timers;
     event->data = dumb_conn;
 
-    ngx_post_event(event, &ngx_posted_events);
+    ngx_add_timer(event, 0);
 
     return NGX_OK;
 }
@@ -59,14 +59,14 @@ ngx_dynamic_healthcheck_init_worker(ngx_cycle_t *cycle)
 template <class S, class PeersT, class PeerT> ngx_int_t
 do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
 {
-    PeerT                        *peer;
-    PeersT                       *primary, *peers;
-    ngx_uint_t                    i;
-    void                         *addr;
-    ngx_dynamic_hc_state_node_t   state;
-    ngx_dynamic_healthcheck_peer *p;
-    ngx_str_t                     type = event->conf->shared->type;
-    ngx_msec_t                    touched;
+    PeerT                         *peer;
+    PeersT                        *primary, *peers;
+    ngx_uint_t                     i;
+    void                          *addr;
+    ngx_dynamic_hc_state_node_t    state;
+    ngx_dynamic_healthcheck_peer  *p;
+    ngx_str_t                      type = event->conf->shared->type;
+    ngx_msec_t                     touched;
 
     primary = (PeersT *) uscf->peer.data;
     peers = primary;
@@ -75,49 +75,65 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
 
     touched = ngx_current_msec;
     
-    for (i = 0; peers && i < 2; peers = peers->next, i++)
+    for (i = 0; peers && i < 2; peers = peers->next, i++) {
+
         for (peer = peers->peer; peer; peer = peer->next) {
-            state = ngx_dynamic_healthcheck_state_get
-                        (&event->conf->state, &peer->name,
-                         peer->sockaddr, peer->socklen,
-                         event->conf->shared->buffer_size);
+
+            state = ngx_dynamic_healthcheck_state_get(&event->conf->peers,
+                        &peer->server, &peer->name,
+                        peer->sockaddr, peer->socklen,
+                        event->conf->shared->buffer_size);
+
             if (state.local == NULL)
                 goto nomem;
 
-            if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0) {
+            state.local->module = event->conf->config.module;
+            state.local->upstream = event->conf->config.upstream;
+
+            if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0)
+
                 addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_tcp<PeerT>),
                                   event->log);
-            } else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0) {
+
+            else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0)
+
                 addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_http<PeerT>),
                                   event->log);
-            } else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0) {
+
+            else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0)
+
                 addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_ssl<PeerT>),
                                   event->log);
-            } else
+            else
                 goto end;
 
-            if (addr == NULL) {
-                ngx_dynamic_healthcheck_state_delete(state);
+            if (addr == NULL)
                 goto nomem;
-            }
 
-            if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0) {
+            if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0)
+
                 p = new (addr)
                     ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, state);
-            } else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0) {
+
+            else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0)
+
                 p = new (addr)
                     ngx_dynamic_healthcheck_http<PeerT>(peer, event, state);
-            } else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0) {
+
+            else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0)
+
                 p = new (addr)
                     ngx_dynamic_healthcheck_ssl<PeerT>(peer, event, state);
-            } else
-                p = NULL;
 
-            if (p != NULL)
-                p->check();
+            else
+                continue;
+
+            p->check();
         }
 
-    ngx_dynamic_healthcheck_state_gc(&event->conf->shared->shared, touched);
+    }
+
+    ngx_dynamic_healthcheck_state_gc(&event->conf->shared->state, touched);
 
 end:
 

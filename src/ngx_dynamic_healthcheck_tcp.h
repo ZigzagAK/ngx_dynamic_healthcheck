@@ -17,10 +17,10 @@ protected:
     ngx_dynamic_healthcheck_opts_t *shared;
 
     virtual ngx_int_t
-    on_send(ngx_dynamic_hc_state_node_t *state)
+    on_send(ngx_dynamic_hc_local_node_t *state)
     {
-        ngx_buf_t         *buf = state->local->buf;
-        ngx_connection_t  *c = state->local->pc.connection;
+        ngx_buf_t         *buf = state->buf;
+        ngx_connection_t  *c = state->pc.connection;
         ssize_t            size;
 #if (NGX_DEBUG)
         ngx_str_t          tmp;
@@ -59,10 +59,10 @@ protected:
     }
 
     virtual ngx_int_t
-    on_recv(ngx_dynamic_hc_state_node_t *state)
+    on_recv(ngx_dynamic_hc_local_node_t *state)
     {
-        ngx_buf_t         *buf = state->local->buf;
-        ngx_connection_t  *c = state->local->pc.connection;
+        ngx_buf_t         *buf = state->buf;
+        ngx_connection_t  *c = state->pc.connection;
         ssize_t            size;
         ngx_str_t          s;
 

@@ -36,7 +36,7 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
     (ngx_dynamic_healthcheck_conf_t *conf, ngx_str_t *host, ngx_flag_t disable)
 {
     ngx_uint_t        i;
-    ngx_slab_pool_t  *slab = conf->state.shared->slab;
+    ngx_slab_pool_t  *slab = conf->peers.shared->slab;
     ngx_str_array_t  *disabled_hosts;
     ngx_str_array_t   new_disabled_hosts;
 
@@ -118,7 +118,7 @@ ngx_dynamic_healthcheck_api_base::do_update
      ngx_dynamic_healthcheck_opts_t *opts,
      ngx_flag_t flags)
 {
-    ngx_slab_pool_t                 *slab = conf->state.shared->slab;
+    ngx_slab_pool_t                 *slab = conf->peers.shared->slab;
     ngx_dynamic_healthcheck_opts_t   sh;
     ngx_flag_t                       b = 1;
 
@@ -226,7 +226,7 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
         return;
     }
 
-    ngx_shmtx_lock(&conf->state.shared->slab->mutex);
+    ngx_shmtx_lock(&conf->peers.shared->slab->mutex);
 
     lua_newtable(L);
 
@@ -327,7 +327,7 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
         lua_setfield(L, -2, "command");
     }
 
-    ngx_shmtx_unlock(&conf->state.shared->slab->mutex);
+    ngx_shmtx_unlock(&conf->peers.shared->slab->mutex);
 }
 
 
@@ -430,7 +430,7 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
     ngx_dynamic_healthcheck_opts_t  opts;
-    ngx_slab_pool_t                *slab = conf->state.shared->slab;
+    ngx_slab_pool_t                *slab = conf->peers.shared->slab;
     ngx_uint_t                      i;
     ngx_flag_t                      is_http;
     int                             top = lua_gettop(L);
@@ -622,7 +622,7 @@ get_status(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf)
         lua_newtable(L);
 
         for (peer = peers->peer; peer; peer = peer->next) {
-            if (ngx_dynamic_healthcheck_state_stat(&conf->state,
+            if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
                     &peer->name, &stat) == NGX_OK) {
                 lua_pushlstring(L, (const char *) peer->name.data,
                                 peer->name.len);

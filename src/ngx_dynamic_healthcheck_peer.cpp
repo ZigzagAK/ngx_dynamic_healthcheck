@@ -109,7 +109,7 @@ ngx_dynamic_healthcheck_peer::fail(ngx_flag_t skip)
     close();
 
     state.shared->fall_total++;
-    if (++state.shared->fall >= shared->fall)
+    if (++state.shared->fall >= opts->fall)
         down(skip);
 
     state.shared->rise = 0;
@@ -130,7 +130,7 @@ ngx_dynamic_healthcheck_peer::success()
     set_keepalive();
 
     state.shared->rise_total++;
-    if (++state.shared->rise >= shared->rise)
+    if (++state.shared->rise >= opts->rise)
         up();
 
     state.shared->fall = 0;
@@ -166,10 +166,10 @@ ngx_dynamic_healthcheck_peer::handle_idle(ngx_event_t *ev)
     }
 
     if (c->fd == -1 && fd != -1) {
-        ngx_log_debug4(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: addr=%V, fd=%d idle close",
+        ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                       "[%V] %V: %V addr=%V, fd=%d idle close",
                        &state->module, &state->upstream,
-                       &state->name.str, fd);
+                       &state->server, &state->name, c->fd);
     }
 
     if (c->fd == -1)
@@ -232,7 +232,7 @@ ngx_dynamic_healthcheck_peer::handle_connect(ngx_event_t *ev)
     c->read->handler = &ngx_dynamic_healthcheck_peer::handle_dummy;
     c->write->handler = &ngx_dynamic_healthcheck_peer::handle_write;
 
-    ngx_add_timer(c->write, peer->shared->timeout);
+    ngx_add_timer(c->write, peer->opts->timeout);
     ngx_dynamic_healthcheck_peer::handle_write(c->write);
 }
 
@@ -278,7 +278,11 @@ ngx_dynamic_healthcheck_peer::handle_write(ngx_event_t *ev)
 
     peer->check_state = st_sending;
 
-    rc = peer->on_send(&peer->state);
+    ngx_shmtx_lock(&peer->state.shared->state->slab->mutex);
+
+    rc = peer->on_send(peer->state.local);
+
+    ngx_shmtx_unlock(&peer->state.shared->state->slab->mutex);
 
     ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "[%V] %V: %V addr=%V, fd=%d on_send(), rc=%d",
@@ -319,7 +323,7 @@ ngx_dynamic_healthcheck_peer::handle_write(ngx_event_t *ev)
     peer->state.local->buf->pos = peer->state.local->buf->start;
     peer->state.local->buf->last = peer->state.local->buf->start;
 
-    ngx_add_timer(c->read, peer->shared->timeout);
+    ngx_add_timer(c->read, peer->opts->timeout);
     ngx_dynamic_healthcheck_peer::handle_read(c->read);
 }
 
@@ -365,7 +369,11 @@ ngx_dynamic_healthcheck_peer::handle_read(ngx_event_t *ev)
 
     peer->check_state = st_receiving;
 
-    rc = peer->on_recv(&peer->state);
+    ngx_shmtx_lock(&peer->state.shared->state->slab->mutex);
+
+    rc = peer->on_recv(peer->state.local);
+
+    ngx_shmtx_unlock(&peer->state.shared->state->slab->mutex);
 
     ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "[%V] %V: %V addr=%V, fd=%d on_recv(), rc=%d",
@@ -478,12 +486,12 @@ ngx_dynamic_healthcheck_peer::set_keepalive()
                    "[%V] %V: %V addr=%V, fd=%d set_keepalive(),"
                    " requests=%d of %d",
                    &module, &upstream, &server, &name, c->fd,
-                   c->requests, shared->keepalive);
+                   c->requests, opts->keepalive);
 
-    if (c->error || c->requests >= shared->keepalive)
+    if (c->error || c->requests >= opts->keepalive)
         goto close;
 
-    state.local->expired = current_msec() + 4 * shared->interval * 1000;
+    state.local->expired = current_msec() + 4 * opts->interval * 1000;
 
     c->write->handler = &ngx_dynamic_healthcheck_peer::handle_idle;
     c->read->handler = &ngx_dynamic_healthcheck_peer::handle_idle;
@@ -552,7 +560,7 @@ connected:
         check_state = st_connected;
         c->write->handler = &ngx_dynamic_healthcheck_peer::handle_write;
         c->read->handler = &ngx_dynamic_healthcheck_peer::handle_dummy;
-        ngx_add_timer(c->write, shared->timeout);
+        ngx_add_timer(c->write, opts->timeout);
         ngx_dynamic_healthcheck_peer::handle_write(c->write);
         return;
     }
@@ -564,7 +572,7 @@ connected:
 
     check_state = st_connecting;
 
-    ngx_add_timer(c->write, shared->timeout);
+    ngx_add_timer(c->write, opts->timeout);
 }
 
 
@@ -585,7 +593,7 @@ ngx_dynamic_healthcheck_peer::completed()
 
 ngx_dynamic_healthcheck_peer::ngx_dynamic_healthcheck_peer
     (ngx_dynamic_healthcheck_event_t *ev, ngx_dynamic_hc_state_node_t s)
-        : shared(ev->conf->shared), state(s), event(ev)
+        : opts(ev->conf->shared), state(s), event(ev)
 {
     ngx_connection_t  *c = state.local->pc.connection;
 
@@ -602,9 +610,6 @@ ngx_dynamic_healthcheck_peer::ngx_dynamic_healthcheck_peer
         c->read->ready = 0;
     }
 
-    state.local->module = ev->conf->config.module;
-    state.local->upstream = ev->conf->config.upstream;
-
     state.local->buf->pos = state.local->buf->last = state.local->buf->start;
 }
 
@@ -615,12 +620,12 @@ ngx_dynamic_healthcheck_peer::check()
     static const ngx_str_t skip_addr = ngx_string("0.0.0.0");
 
     ngx_str_array_t hosts[2] = {
-        shared->disabled_hosts_global,
-        shared->disabled_hosts
+        opts->disabled_hosts_global,
+        opts->disabled_hosts
     };
     ngx_uint_t i, j;
 
-    if (shared->disabled)
+    if (opts->disabled)
         goto disabled;
 
     if (name.len >= skip_addr.len

@@ -46,30 +46,30 @@ typedef struct ngx_num_array_s ngx_num_array_t;
 
 
 struct ngx_dynamic_healthcheck_opts_s {
-    ngx_str_t               module;
-    ngx_str_t               upstream;
-    ngx_str_t               type;
-    ngx_int_t               fall;
-    ngx_int_t               rise;
-    ngx_int_t               timeout;
-    ngx_int_t               interval;
-    ngx_uint_t              keepalive;
-    ngx_str_t               request_uri;
-    ngx_str_t               request_method;
-    ngx_keyval_array_t      request_headers;
-    ngx_str_t               request_body;
-    ngx_num_array_t         response_codes;
-    ngx_str_t               response_body;
-    ngx_flag_t              off;
-    ngx_str_array_t         disabled_hosts_global;
-    ngx_str_array_t         disabled_hosts;
-    ngx_flag_t              disabled;
-    size_t                  buffer_size;
-    ngx_msec_t              last;
-    ngx_str_t               persistent;
-    ngx_flag_t              updated;
-    ngx_int_t               loaded;
-    ngx_dynamic_hc_shared_t shared;
+    ngx_str_t                module;
+    ngx_str_t                upstream;
+    ngx_str_t                type;
+    ngx_int_t                fall;
+    ngx_int_t                rise;
+    ngx_int_t                timeout;
+    ngx_int_t                interval;
+    ngx_uint_t               keepalive;
+    ngx_str_t                request_uri;
+    ngx_str_t                request_method;
+    ngx_keyval_array_t       request_headers;
+    ngx_str_t                request_body;
+    ngx_num_array_t          response_codes;
+    ngx_str_t                response_body;
+    ngx_flag_t               off;
+    ngx_str_array_t          disabled_hosts_global;
+    ngx_str_array_t          disabled_hosts;
+    ngx_flag_t               disabled;
+    size_t                   buffer_size;
+    ngx_msec_t               last;
+    ngx_str_t                persistent;
+    ngx_flag_t               updated;
+    ngx_int_t                loaded;
+    ngx_dynamic_hc_shared_t  state;
 };
 typedef struct ngx_dynamic_healthcheck_opts_s
 ngx_dynamic_healthcheck_opts_t;
@@ -83,13 +83,13 @@ typedef void (*ngx_shm_zone_post_init_pt)
 
 
 struct ngx_dynamic_healthcheck_conf_s {
-    ngx_dynamic_healthcheck_opts_t  config;
-    ngx_dynamic_healthcheck_opts_t *shared;
-    ngx_dynamic_hc_state_t          state;
-    ngx_event_t                     event;
-    ngx_shm_zone_t                 *zone;
-    ngx_shm_zone_post_init_pt       post_init;
-    void                           *uscf;
+    ngx_dynamic_healthcheck_opts_t   config;
+    ngx_dynamic_healthcheck_opts_t  *shared;
+    ngx_dynamic_hc_state_t           peers;
+    ngx_event_t                      event;
+    ngx_shm_zone_t                  *zone;
+    ngx_shm_zone_post_init_pt        post_init;
+    void                            *uscf;
 };
 typedef struct ngx_dynamic_healthcheck_conf_s ngx_dynamic_healthcheck_conf_t;
 
@@ -104,13 +104,13 @@ typedef void (*ngx_dynamic_healthcheck_event_completed_pt)
     (struct ngx_dynamic_healthcheck_event_s *event);
 
 struct ngx_dynamic_healthcheck_event_s {
-    ngx_connection_t                            dumb_conn;
-    void                                       *uscf;
-    ngx_int_t                                   remains;
-    ngx_flag_t                                  in_progress;
-    ngx_log_t                                  *log;
-    ngx_dynamic_healthcheck_conf_t             *conf;
-    ngx_dynamic_healthcheck_event_completed_pt  completed;
+    ngx_connection_t                             dumb_conn;
+    void                                        *uscf;
+    ngx_int_t                                    remains;
+    ngx_flag_t                                   in_progress;
+    ngx_log_t                                   *log;
+    ngx_dynamic_healthcheck_conf_t              *conf;
+    ngx_dynamic_healthcheck_event_completed_pt   completed;
 };
 typedef struct ngx_dynamic_healthcheck_event_s ngx_dynamic_healthcheck_event_t;
 
@@ -169,11 +169,11 @@ end:
 
         event->completed(event);
 
-        ngx_shmtx_lock(&event->conf->state.shared->slab->mutex);
+        ngx_shmtx_lock(&event->conf->peers.shared->slab->mutex);
 
         ngx_memzero(ev, sizeof(ngx_event_t));
 
-        ngx_shmtx_unlock(&event->conf->state.shared->slab->mutex);
+        ngx_shmtx_unlock(&event->conf->peers.shared->slab->mutex);
 
         ngx_free(event);
     }

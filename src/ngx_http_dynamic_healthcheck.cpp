@@ -327,7 +327,7 @@ ngx_http_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
 
     for (i = 0; peers && i < 2; peers = peers->next, i++)
         for (peer = peers->peer; peer; peer = peer->next) {
-            if (ngx_dynamic_healthcheck_state_stat(&conf->state,
+            if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
                     &peer->name, &stat) == NGX_OK) {
                 peer->down = stat.fall >= conf->shared->fall;
             }
@@ -584,7 +584,7 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
         return NULL;
 
     if (shared != NULL) {
-        ngx_shmtx_lock(&shared->shared.slab->mutex);
+        ngx_shmtx_lock(&shared->state.slab->mutex);
 
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last,
@@ -649,7 +649,7 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
                 &tab, serialize_str_array(r->pool, &shared->disabled_hosts),
                 &tab);
 
-        ngx_shmtx_unlock(&shared->shared.slab->mutex);
+        ngx_shmtx_unlock(&shared->state.slab->mutex);
     }
 
     return out;
@@ -1099,7 +1099,7 @@ ngx_http_dynamic_healthcheck_status_hc(ngx_http_request_t *r,
                                           &peers_desc[i]);
 
             for (peer = peers->peer; peer; peer = peer->next) {
-                if (ngx_dynamic_healthcheck_state_stat(&conf->state,
+                if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
                         &peer->name, &stat) != NGX_OK)
                     ngx_memzero(&stat, sizeof(ngx_dynamic_hc_stat_t));
 

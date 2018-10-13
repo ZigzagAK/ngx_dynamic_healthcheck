@@ -19,7 +19,7 @@ class ngx_dynamic_healthcheck_peer
 {
 private:
 
-    ngx_dynamic_healthcheck_opts_t   *shared;
+    ngx_dynamic_healthcheck_opts_t   *opts;
     ngx_dynamic_hc_state_node_t       state;
 
     typedef enum {
@@ -31,7 +31,7 @@ private:
         st_receiving,
         st_done
     } ngx_check_state_t;
-    ngx_check_state_t                check_state;
+    ngx_check_state_t                 check_state;
     
 protected:
 
@@ -95,10 +95,10 @@ protected:
     down(ngx_flag_t skip = 0) = 0;
 
     virtual ngx_int_t
-    on_send(ngx_dynamic_hc_state_node_t *state) = 0;
+    on_send(ngx_dynamic_hc_local_node_t *state) = 0;
 
     virtual ngx_int_t
-    on_recv(ngx_dynamic_hc_state_node_t *state) = 0;
+    on_recv(ngx_dynamic_hc_local_node_t *state) = 0;
 
 public:
 
@@ -157,10 +157,10 @@ public:
 
         peer->conns++;
 
-        name     = peer->name;
-        server   = peer->server;
-        upstream = event->conf->config.upstream;
-        module   = event->conf->config.module;
+        name     = s.local->name.str;
+        server   = s.local->server;
+        upstream = s.local->upstream;
+        module   = s.local->module;
 
         ngx_rwlock_unlock(&peer->lock);
 
