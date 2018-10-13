@@ -530,9 +530,9 @@ ngx_dynamic_healthcheck_peer::connect()
 
     state.local->pc.sockaddr = state.local->sockaddr;
     state.local->pc.socklen = state.local->socklen;
-    state.local->pc.name = &state.shared->name.str;
+    state.local->pc.name = &state.local->name.str;
     state.local->pc.get = ngx_event_get_peer;
-    state.local->pc.log = event->log;
+    state.local->pc.log = ngx_cycle->log;
     state.local->pc.log_error = NGX_ERROR_ERR;
 
     rc = ngx_event_connect_peer(&state.local->pc);
@@ -550,10 +550,10 @@ ngx_dynamic_healthcheck_peer::connect()
 connected:
 
     c->pool = state.local->pool;
-    c->log = event->log;
+    c->log = ngx_cycle->log;
     c->sendfile = 0;
-    c->read->log = event->log;
-    c->write->log = event->log;
+    c->read->log = ngx_cycle->log;
+    c->write->log = ngx_cycle->log;
     c->data = this;
 
     if (rc != NGX_AGAIN) {
@@ -666,6 +666,7 @@ disabled:
 
 ngx_dynamic_healthcheck_peer::~ngx_dynamic_healthcheck_peer()
 {}
+
 
 ngx_int_t
 ngx_dynamic_healthcheck_match_buffer(ngx_str_t *pattern, ngx_str_t *s)

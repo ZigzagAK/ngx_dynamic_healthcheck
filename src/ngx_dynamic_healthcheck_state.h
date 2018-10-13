@@ -81,7 +81,6 @@ typedef struct ngx_dynamic_hc_stat_s {
     ngx_int_t                      rise;
     ngx_int_t                      fall_total;
     ngx_int_t                      rise_total;
-    ngx_msec_t                     touched;
 } ngx_dynamic_hc_stat_t;
 
 

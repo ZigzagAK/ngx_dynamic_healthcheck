@@ -21,22 +21,21 @@ ngx_dynamic_healthcheck_state_stat(ngx_dynamic_hc_state_t *state,
     shared = (ngx_dynamic_hc_shared_node_t *)
         ngx_str_rbtree_lookup(rbtree, name, hash);
 
-    if (shared != NULL) {
-
-        stat->fall = shared->fall;
-        stat->fall_total = shared->fall_total;
-        stat->rise = shared->rise;
-        stat->rise_total = shared->rise_total;
-        stat->touched = shared->touched;
+    if (shared == NULL) {
 
         ngx_shmtx_unlock(&slab->mutex);
 
-        return NGX_OK;
+        return NGX_DECLINED;
     }
+
+    stat->fall = shared->fall;
+    stat->rise = shared->rise;
+    stat->fall_total = shared->fall_total;
+    stat->rise_total = shared->rise_total;
 
     ngx_shmtx_unlock(&slab->mutex);
 
-    return NGX_DECLINED;
+    return NGX_OK;
 }
 
 
