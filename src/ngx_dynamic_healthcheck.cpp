@@ -146,7 +146,7 @@ nomem:
     ngx_rwlock_unlock(&primary->rwlock);
 
     ngx_log_error(NGX_LOG_ERR, event->log, 0,
-                  "[%V] no memory", &event->conf->shared->module);
+                  "[%V] no memory", &event->conf->config.module);
 
     return NGX_ERROR;
 }

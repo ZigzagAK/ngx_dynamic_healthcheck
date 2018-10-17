@@ -169,11 +169,7 @@ end:
 
         event->completed(event);
 
-        ngx_shmtx_lock(&event->conf->peers.shared->slab->mutex);
-
         ngx_memzero(ev, sizeof(ngx_event_t));
-
-        ngx_shmtx_unlock(&event->conf->peers.shared->slab->mutex);
 
         ngx_free(event);
     }
