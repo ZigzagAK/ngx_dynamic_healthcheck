@@ -34,7 +34,7 @@ ngx_dynamic_healthcheck_peer_test_connect(ngx_connection_t *c)
 
         if (err) {
             (void) ngx_connection_error(c, err,
-                                    "kevent() reported that connect() failed");
+                           (char *) "kevent() reported that connect() failed");
             return NGX_ERROR;
         }
 
