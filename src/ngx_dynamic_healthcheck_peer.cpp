@@ -482,6 +482,9 @@ ngx_dynamic_healthcheck_peer::set_keepalive()
     if (c == NULL)
         return;
 
+    if (c->read->pending_eof)
+        goto close;
+
     ngx_log_debug7(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "[%V] %V: %V addr=%V, fd=%d set_keepalive(),"
                    " requests=%d of %d",

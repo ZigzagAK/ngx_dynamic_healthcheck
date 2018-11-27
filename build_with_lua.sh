@@ -77,6 +77,7 @@ function build_debug() {
               --with-stream \
               --with-debug \
               --with-cc-opt="-O0 -D_WITH_LUA_API" \
+              --add-module=../echo-nginx-module \
               --add-module=../ngx_devel_kit \
               --add-module=../lua-nginx-module \
               --add-module=../stream-lua-nginx-module \
@@ -109,6 +110,7 @@ function build_release() {
               $EMBEDDED_OPTS \
               --with-cc-opt="-D_WITH_LUA_API" \
               --with-stream \
+              --add-module=../echo-nginx-module \
               --add-module=../ngx_devel_kit \
               --add-module=../lua-nginx-module \
               --add-module=../stream-lua-nginx-module \
@@ -223,6 +225,7 @@ function download() {
   download_module openresty   lua-nginx-module                 master
   download_module openresty   lua-cjson                        master
   download_module ZigzagAK    ngx_dynamic_upstream             master
+  download_module openresty   echo-nginx-module                tags/v0.61
 
   download_dep http://zlib.net                                 zlib      $ZLIB_VERSION      tar.gz
 

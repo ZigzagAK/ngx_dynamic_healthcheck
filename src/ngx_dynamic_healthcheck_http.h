@@ -152,16 +152,19 @@ recv_buf:
 
 recv_body:
 
-        if (status.http_version > NGX_HTTP_VERSION_10)
-            if (!chunked && content_length == 0)
-                goto well_done;
-
-        if (status.http_version == NGX_HTTP_VERSION_10 && content_length == 0)
-            content_length = shared->buffer_size - 1;
-
         // receiving body
 
         if (body.start == NULL) {
+
+            if (!chunked) {
+
+                if (content_length == 0)
+                    goto well_done;
+
+                if (content_length == -1)
+                    content_length = shared->buffer_size - 1;
+            } else
+                content_length = 0;
 
             if (shared->buffer_size - 1 < (size_t) content_length) {
                 ngx_log_error(NGX_LOG_WARN, c->log, 0,
@@ -194,9 +197,6 @@ recv_body:
 
             body.pos = body.last = body.start;
             body.end = body.start + shared->buffer_size;
-
-            if (chunked)
-                content_length = 0;
         }
 
         for (;;) {
@@ -231,14 +231,18 @@ recv_body:
 
 well_done:
 
-        if (body.start != NULL) {
+        ngx_str_t s;
+        s.data = body.start;
+        s.len = body.last - body.start;
+
+        if (s.len) {
             ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
                            state->pc.connection->log, 0,
                            "[%V] %V: %V addr=%V, fd=%d "
-                           "http on_recv() body:\n%s",
+                           "http on_recv() body:\n%V",
                            &this->module, &this->upstream,
                            &this->server, &this->name, c->fd,
-                           body.start);
+                           &s);
         }
 
         if (shared->response_codes.len) {
@@ -256,9 +260,6 @@ well_done:
         }
 
         if (shared->response_body.len) {
-            ngx_str_t s;
-            s.data = body.start;
-            s.len = body.last - body.start;
             switch(ngx_dynamic_healthcheck_match_buffer(&shared->response_body,
                                                         &s)) {
                 case NGX_OK:
@@ -507,7 +508,7 @@ public:
     ngx_dynamic_healthcheck_http(PeerT *peer,
         ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
         : ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, s),
-          content_length(0), chunked(0), pool(NULL)
+          content_length(-1), chunked(0), pool(NULL)
     {
         ngx_memzero(&r, sizeof(ngx_http_request_t));
         ngx_memzero(&status, sizeof(ngx_http_status_t));
