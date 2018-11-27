@@ -63,6 +63,7 @@ struct ngx_dynamic_healthcheck_opts_s {
     ngx_flag_t               off;
     ngx_str_array_t          disabled_hosts_global;
     ngx_str_array_t          disabled_hosts;
+    ngx_str_array_t          excluded_hosts;
     ngx_flag_t               disabled;
     size_t                   buffer_size;
     ngx_msec_t               last;

@@ -88,7 +88,7 @@ static ngx_command_t ngx_stream_dynamic_healthcheck_commands[] = {
       NULL },
 
     { ngx_string("check_disable_host"),
-      NGX_STREAM_UPS_CONF|NGX_CONF_ANY,
+      NGX_STREAM_UPS_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_array_slot2,
       NGX_STREAM_SRV_CONF_OFFSET,
       offsetof(ngx_dynamic_healthcheck_opts_t, disabled_hosts),
@@ -99,6 +99,13 @@ static ngx_command_t ngx_stream_dynamic_healthcheck_commands[] = {
       ngx_conf_set_str_slot,
       NGX_STREAM_SRV_CONF_OFFSET,
       offsetof(ngx_dynamic_healthcheck_opts_t, persistent),
+      NULL },
+
+    { ngx_string("check_exclude_host"),
+      NGX_STREAM_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_array_slot2,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      offsetof(ngx_dynamic_healthcheck_opts_t, excluded_hosts),
       NULL },
 
     ngx_null_command
@@ -215,6 +222,7 @@ ngx_stream_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
 
     conf->config.disabled_hosts_global.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
     conf->config.disabled_hosts.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
+    conf->config.excluded_hosts.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
 
     conf->config.module      = NGX_DH_MODULE_STREAM;
     conf->config.fall        = 1;

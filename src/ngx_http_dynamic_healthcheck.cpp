@@ -127,7 +127,7 @@ static ngx_command_t ngx_http_dynamic_healthcheck_commands[] = {
       NULL },
 
     { ngx_string("check_disable_host"),
-      NGX_HTTP_UPS_CONF|NGX_CONF_ANY,
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_array_slot2,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_dynamic_healthcheck_opts_t, disabled_hosts),
@@ -145,6 +145,13 @@ static ngx_command_t ngx_http_dynamic_healthcheck_commands[] = {
       ngx_conf_set_str_slot,
       NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(ngx_dynamic_healthcheck_opts_t, response_body),
+      NULL },
+
+    { ngx_string("check_exclude_host"),
+      NGX_HTTP_UPS_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_str_array_slot2,
+      NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(ngx_dynamic_healthcheck_opts_t, excluded_hosts),
       NULL },
 
     { ngx_string("check_persistent"),
@@ -296,6 +303,7 @@ ngx_http_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
 
     conf->config.disabled_hosts_global.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
     conf->config.disabled_hosts.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
+    conf->config.excluded_hosts.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
 
     conf->config.module      = NGX_DH_MODULE_HTTP;
     conf->config.fall        = 1;
@@ -640,13 +648,15 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
             "%V    },"                            CRLF
             "%V    \"disabled\":%d,"              CRLF
             "%V    \"off\":%d,"                   CRLF
-            "%V    \"disabled_hosts\":[%V]"       CRLF
+            "%V    \"disabled_hosts\":[%V],"      CRLF
+            "%V    \"excluded_hosts\":[%V]"       CRLF
             "%V}",
                 &tab,
                 &tab,
                 &tab, shared->disabled,
                 &tab, shared->off,
                 &tab, serialize_str_array(r->pool, &shared->disabled_hosts),
+                &tab, serialize_str_array(r->pool, &shared->excluded_hosts),
                 &tab);
 
         ngx_shmtx_unlock(&shared->state.slab->mutex);
@@ -858,7 +868,7 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
     u_char                         *c, *s;
 
     extern ngx_str_t NGX_DH_MODULE_STREAM;
-    
+
     stream          = get_arg(r, "arg_stream");
     upstream        = get_arg(r, "arg_upstream");
     type            = get_arg(r, "arg_type");

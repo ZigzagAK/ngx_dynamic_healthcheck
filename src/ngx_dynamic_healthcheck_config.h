@@ -47,7 +47,7 @@ ngx_http_dynamic_healthcheck_check_response_codes(ngx_conf_t *cf,
     }
 
 #define ngx_conf_merge_array_value(conf, prev)                               \
-    if (conf.data == NULL) {                                                 \
+    if (conf.data == NGX_CONF_UNSET_PTR) {                                   \
         if (prev.data) {                                                     \
             conf.len = prev.len;                                             \
             conf.data = prev.data;                                           \

@@ -634,6 +634,17 @@ ngx_dynamic_healthcheck_peer::check()
         return completed();
     }
 
+    for (i = 0; i < opts->excluded_hosts.len; i++) {
+        if (name.len >= opts->excluded_hosts.data[i].len &&
+            ngx_memcmp(name.data, opts->excluded_hosts.data[i].data,
+                       opts->excluded_hosts.data[i].len) == 0)
+            goto excluded;
+        if (server.len >= opts->excluded_hosts.data[i].len &&
+            ngx_memcmp(server.data, opts->excluded_hosts.data[i].data,
+                       opts->excluded_hosts.data[i].len) == 0)
+            goto excluded;
+    }
+
     for (j = 0; j < 2; j++) {
         for (i = 0; i < hosts[j].len; i++) {
             if (name.len >= hosts[j].data[i].len &&
@@ -657,6 +668,18 @@ disabled:
 
     close();
     down();
+
+    this->~ngx_dynamic_healthcheck_peer();
+
+    ngx_free(this);
+
+    return;
+
+excluded:
+
+    ngx_log_debug4(NGX_LOG_DEBUG_HTTP, event->log, 0,
+                   "[%V] %V: %V addr=%V exclude",
+                   &module, &upstream, &server, &name);
 
     this->~ngx_dynamic_healthcheck_peer();
 

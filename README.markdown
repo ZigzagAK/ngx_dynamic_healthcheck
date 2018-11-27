@@ -38,6 +38,7 @@ Table of Contents
         - [check_response_body](#check_response_body)
         - [check_persistent](#check_persistent)
         - [check_disable_host](#check_disable_host)
+        - [check_exclude_host](#check_exclude_host)
     * [Global healthcheck parameters](#global_healthcheck_parameters)
         - [healthcheck](#healthcheck)
         - [healthcheck_request_uri](#healthcheck_request_uri)
@@ -269,6 +270,15 @@ Disable specific host or peer in upstream (may be changed via persistance).
 
 [Back to TOC](#table-of-contents)
 
+check_exclude_host
+----------------
+* **syntax**: `check_exclude_host 1.1.1.1:3456`
+* **default**: `none`
+* **context**: `upstream`
+
+Exclude specific host or peer in upstream from healthcheck.
+
+[Back to TOC](#table-of-contents)
 
 Global healthcheck parameters
 --------------------------

@@ -97,7 +97,7 @@ function build_debug() {
   fi
   make install > /dev/null
 
-  mv "$INSTALL_PREFIX/nginx-$VERSION$SUFFIX/sbin/nginx" "$INSTALL_PREFIX/nginx-$VERSION$SUFFIX/sbin/nginx.debug"
+# mv "$INSTALL_PREFIX/nginx-$VERSION$SUFFIX/sbin/nginx" "$INSTALL_PREFIX/nginx-$VERSION$SUFFIX/sbin/nginx.debug"
 
   cd ..
 }
@@ -255,11 +255,11 @@ function build() {
 
   build_cJSON
 
- # make clean > /dev/null 2>&1
- # build_debug
-
   make clean > /dev/null 2>&1
-  build_release
+  build_debug
+
+ # make clean > /dev/null 2>&1
+ # build_release
 
   install_file  "$JIT_PREFIX/usr/local/lib"           .
   install_file  lua-cjson/cjson.so                    lib/lua/5.1

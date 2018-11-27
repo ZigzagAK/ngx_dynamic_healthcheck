@@ -341,8 +341,11 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
                                                  &opts->request_headers, slab);
     b = b && NGX_OK == ngx_shm_str_array_copy(&sh->disabled_hosts,
                                               &opts->disabled_hosts, slab);
+
 skip:
 
+    b = b && NGX_OK == ngx_shm_str_array_copy(&sh->excluded_hosts,
+                                              &opts->excluded_hosts, slab);
     b = b && NGX_OK == ngx_shm_str_array_copy(&sh->disabled_hosts_global,
                                               &opts->disabled_hosts_global,
                                               slab);

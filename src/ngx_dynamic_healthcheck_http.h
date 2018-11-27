@@ -32,15 +32,20 @@ protected:
         ngx_uint_t                       i;
         ngx_dynamic_healthcheck_opts_t  *shared = this->shared;
 
-        buf->last = ngx_snprintf(buf->last, shared->buffer_size,
-            "%V %V HTTP/1.%s\r\n"
-            "Host: %V\r\n"
-            "User-Agent: nginx/"NGINX_VERSION"\r\n"
-            "Connection: %s\r\n",
+        buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+            "%V %V HTTP/1.%s\r\n",
             &shared->request_method,
             &shared->request_uri,
-            shared->keepalive > c->requests + 1 ? "1" : "0",
-            &state->name.str,
+            shared->keepalive > c->requests + 1 ? "1" : "0");
+
+        if (state->server.len >= 5
+            && ngx_strncmp(state->server.data, "unix:", 5) != 0)
+            buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+                "Host: %V\r\n", &state->name.str);
+
+        buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+            "User-Agent: nginx/"NGINX_VERSION"\r\n"
+            "Connection: %s\r\n",
             shared->keepalive > c->requests + 1 ? "keep-alive" : "close");
 
         for (i = 0; i < shared->request_headers.len; i++)

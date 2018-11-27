@@ -262,6 +262,16 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
 
     lua_setfield(L, -2, "disabled_hosts");
 
+    lua_newtable(L);
+
+    for (i = 0; i < opts->excluded_hosts.len; i++) {
+        lua_pushlstring(L, (char *) opts->excluded_hosts.data[i].data,
+                        opts->excluded_hosts.data[i].len);
+        lua_rawseti(L, -2, i + 1);
+    }
+
+    lua_setfield(L, -2, "excluded_hosts");
+
     lua_pushinteger(L, opts->keepalive);
     lua_setfield(L, -2, "keepalive");
 
