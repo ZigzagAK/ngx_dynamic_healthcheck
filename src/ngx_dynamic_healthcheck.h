@@ -116,6 +116,23 @@ struct ngx_dynamic_healthcheck_event_s {
 typedef struct ngx_dynamic_healthcheck_event_s ngx_dynamic_healthcheck_event_t;
 
 
+ngx_inline ngx_flag_t
+ngx_peer_excluded(ngx_str_t *name,
+    ngx_dynamic_healthcheck_conf_t *conf)
+{
+    ngx_uint_t i;
+
+    for (i = 0; i < conf->shared->excluded_hosts.len; i++) {
+        if (name->len >= conf->shared->excluded_hosts.data[i].len &&
+            ngx_memcmp(name->data, conf->shared->excluded_hosts.data[i].data,
+                       conf->shared->excluded_hosts.data[i].len) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+
 #ifdef __cplusplus
 
 class ngx_dynamic_event_handler_base {

@@ -138,6 +138,7 @@ recv_buf:
 
             switch (receive_buf(state)) {
                 case NGX_OK:
+                case NGX_DONE:
                     break;
 
                 case NGX_AGAIN:
@@ -150,9 +151,13 @@ recv_buf:
         }
 
 recv_body:
-        
-        if (!chunked && content_length == 0)
-            goto well_done;
+
+        if (status.http_version > NGX_HTTP_VERSION_10)
+            if (!chunked && content_length == 0)
+                goto well_done;
+
+        if (status.http_version == NGX_HTTP_VERSION_10 && content_length == 0)
+            content_length = shared->buffer_size - 1;
 
         // receiving body
 
@@ -210,6 +215,9 @@ recv_body:
 
             switch (receive_buf(state)) {
                 case NGX_OK:
+                    goto well_done;
+
+                case NGX_DONE:
                     break;
 
                 case NGX_AGAIN:
@@ -315,14 +323,14 @@ well_done:
                        size);
 
         if (size == NGX_ERROR)
-            return NGX_ERROR;
+            return c->read->pending_eof ? NGX_OK : NGX_ERROR;
 
         if (size == NGX_AGAIN)
             return NGX_AGAIN;
 
         buf->last += size;
 
-        return NGX_OK;
+        return c->read->pending_eof ? /* closed */ NGX_OK : NGX_DONE;
     }
 
     ngx_int_t

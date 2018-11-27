@@ -335,6 +335,9 @@ ngx_http_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
 
     for (i = 0; peers && i < 2; peers = peers->next, i++)
         for (peer = peers->peer; peer; peer = peer->next) {
+            if (ngx_peer_excluded(&peer->name, conf)
+                || ngx_peer_excluded(&peer->server, conf))
+                continue;
             if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
                     &peer->name, &stat) == NGX_OK) {
                 peer->down = stat.rise < conf->shared->rise;
