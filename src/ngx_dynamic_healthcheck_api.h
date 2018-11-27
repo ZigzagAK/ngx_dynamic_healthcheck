@@ -81,6 +81,14 @@ protected:
     do_disable_host(ngx_dynamic_healthcheck_conf_t *conf, ngx_str_t *host,
                     ngx_flag_t disable);
 
+    static void
+    do_disable_host(ngx_http_upstream_srv_conf_t *uscf, ngx_str_t *host,
+                    ngx_flag_t disable);
+
+    static void
+    do_disable_host(ngx_stream_upstream_srv_conf_t *uscf, ngx_str_t *host,
+                    ngx_flag_t disable);
+
 #ifdef _WITH_LUA_API
 
     static void
@@ -184,6 +192,10 @@ private:
         conf = get_srv_conf(uscf);
         if (conf == NULL)
             return NGX_ERROR;
+
+        if (ngx_peer_excluded(host, conf))
+            ngx_dynamic_healthcheck_api_base::do_disable_host(uscf, host,
+                                                              disable);
 
         return ngx_dynamic_healthcheck_api_base::do_disable_host(conf, host,
                                                                  disable);

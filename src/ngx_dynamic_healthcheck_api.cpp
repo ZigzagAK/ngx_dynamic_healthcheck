@@ -112,6 +112,64 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
 }
 
 
+void
+ngx_dynamic_healthcheck_api_base::do_disable_host
+    (ngx_http_upstream_srv_conf_t *uscf,
+     ngx_str_t *host,
+     ngx_flag_t disable)
+{
+    ngx_http_upstream_rr_peers_t  *primary, *peers;
+    ngx_http_upstream_rr_peer_t   *peer;
+    ngx_uint_t                     i;
+
+    primary = (ngx_http_upstream_rr_peers_t *) uscf->peer.data;
+    peers = primary;
+
+    ngx_rwlock_rlock(&primary->rwlock);
+
+    for (i = 0; peers && i < 2; peers = peers->next, i++)
+        for (peer = peers->peer; peer; peer = peer->next) {
+            if (ngx_memn2cmp(peer->server.data, host->data,
+                             peer->server.len, host->len) == 0
+                || ngx_memn2cmp(peer->name.data, host->data,
+                                peer->name.len, host->len) == 0) {
+                peer->down = disable;
+            }
+        }
+
+    ngx_rwlock_unlock(&primary->rwlock);
+}
+
+
+void
+ngx_dynamic_healthcheck_api_base::do_disable_host
+    (ngx_stream_upstream_srv_conf_t *uscf,
+     ngx_str_t *host,
+     ngx_flag_t disable)
+{
+    ngx_stream_upstream_rr_peers_t  *primary, *peers;
+    ngx_stream_upstream_rr_peer_t   *peer;
+    ngx_uint_t                     i;
+
+    primary = (ngx_stream_upstream_rr_peers_t *) uscf->peer.data;
+    peers = primary;
+
+    ngx_rwlock_rlock(&primary->rwlock);
+
+    for (i = 0; peers && i < 2; peers = peers->next, i++)
+        for (peer = peers->peer; peer; peer = peer->next) {
+            if (ngx_memn2cmp(peer->server.data, host->data,
+                             peer->server.len, host->len) == 0
+                || ngx_memn2cmp(peer->name.data, host->data,
+                                peer->name.len, host->len) == 0) {
+                peer->down = disable;
+            }
+        }
+
+    ngx_rwlock_unlock(&primary->rwlock);
+}
+
+
 ngx_int_t
 ngx_dynamic_healthcheck_api_base::do_update
     (ngx_dynamic_healthcheck_conf_t *conf,
@@ -705,7 +763,7 @@ ngx_dynamic_healthcheck_api_base::get_upstream_conf
 
 ngx_dynamic_healthcheck_conf_t *
 ngx_dynamic_healthcheck_api_base::get_srv_conf(
-   ngx_http_upstream_srv_conf_t * uscf)
+   ngx_http_upstream_srv_conf_t *uscf)
 {
     extern ngx_module_t ngx_http_dynamic_healthcheck_module;
     return (ngx_dynamic_healthcheck_conf_t *)
