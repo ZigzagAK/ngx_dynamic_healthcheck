@@ -62,7 +62,7 @@ Table of Contents
 Status
 ====
 
-This module is under development.
+This module is production ready.
 
 Description
 =======
