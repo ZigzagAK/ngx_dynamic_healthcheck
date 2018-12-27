@@ -391,13 +391,15 @@ ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
     ngx_conf_merge_str_value(conf->config.persistent,
         main_conf->config.persistent);
 
-    if (conf->config.type.len != 0)
+    if (conf->config.type.data != NULL
+        && ngx_strncmp(conf->config.type.data, "http", 4) == 0)
         if (conf->config.request_uri.len == 0) {
             ngx_str_null(&conf->config.request_method);
-            ngx_str_null(&conf->config.request_body);
-            ngx_str_null(&conf->config.response_body);
             ngx_memzero(&conf->config.request_headers,
                         sizeof(ngx_keyval_array_t));
+            ngx_str_null(&conf->config.request_body);
+            ngx_str_null(&conf->config.response_body);
+
             conf->config.keepalive = 1;
             ngx_memzero(&conf->config.response_codes, sizeof(ngx_num_array_t));
         }
@@ -584,7 +586,7 @@ static ngx_chain_t *
 ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
     ngx_dynamic_healthcheck_opts_t *shared, ngx_str_t tab)
 {
-    ngx_flag_t   is_http = ngx_strcmp(shared->module.data, "http") == 0;
+    ngx_flag_t   is_http = ngx_strncmp(shared->type.data, "http", 4) == 0;
     ngx_chain_t *out = (ngx_chain_t *) ngx_pcalloc(r->pool,
                                                    sizeof(ngx_chain_t));
     if (out == NULL)
@@ -606,6 +608,7 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
             "%V    \"keepalive\":%d,"             CRLF
             "%V    \"timeout\":%d,"               CRLF
             "%V    \"type\":\"%V\","              CRLF
+            "%V    \"port\":%d,"                  CRLF
             "%V    \"command\":{"                 CRLF,
                 &tab, shared->rise,
                 &tab, shared->fall,
@@ -613,6 +616,7 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
                 &tab, shared->keepalive,
                 &tab, shared->timeout,
                 &tab, &shared->type,
+                &tab, shared->port,
                 &tab);
 
         if (is_http) {
@@ -868,6 +872,7 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
     ngx_http_variable_value_t      *disable_host;
     ngx_http_variable_value_t      *enable_host;
     ngx_http_variable_value_t      *disable;
+    ngx_http_variable_value_t      *port;
     u_char                         *c, *s;
 
     extern ngx_str_t NGX_DH_MODULE_STREAM;
@@ -880,6 +885,7 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
     timeout         = get_arg(r, "arg_timeout");
     interval        = get_arg(r, "arg_interval");
     keepalive       = get_arg(r, "arg_keepalive");
+    port            = get_arg(r, "arg_port");
     request_uri     = get_arg(r, "arg_request_uri");
     request_method  = get_arg(r, "arg_request_method");
     request_headers = get_arg(r, "arg_request_headers");
@@ -911,6 +917,8 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
                            &flags, NGX_DYNAMIC_UPDATE_OPT_INTERVAL);
     set_num_opt<ngx_uint_t>(keepalive, &opts.keepalive,
                             &flags, NGX_DYNAMIC_UPDATE_OPT_KEEPALIVE);
+    set_num_opt<ngx_uint_t>(port, &opts.port,
+                            &flags, NGX_DYNAMIC_UPDATE_OPT_PORT);
     set_str_opt(request_uri, &opts.request_uri,
                 &flags, NGX_DYNAMIC_UPDATE_OPT_URI);
     set_str_opt(request_method, &opts.request_method,

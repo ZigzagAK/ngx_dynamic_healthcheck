@@ -40,6 +40,7 @@ extern "C" {
 #define NGX_DYNAMIC_UPDATE_OPT_RESPONSE_BODY    2048
 #define NGX_DYNAMIC_UPDATE_OPT_OFF              4096
 #define NGX_DYNAMIC_UPDATE_OPT_DISABLED         8192
+#define NGX_DYNAMIC_UPDATE_OPT_PORT            16384
 
 
 class ngx_dynamic_healthcheck_api_base {
@@ -545,6 +546,9 @@ public:
                 continue;
 
             conf = get_srv_conf(uscf[i]);
+
+            if (conf->shared == NULL)
+                continue;
 
             ngx_shmtx_lock(&conf->shared->state.slab->mutex);
 

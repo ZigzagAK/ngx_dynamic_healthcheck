@@ -224,6 +224,8 @@ ngx_dynamic_healthcheck_api_base::do_update
     if (flags & NGX_DYNAMIC_UPDATE_OPT_KEEPALIVE)
         conf->shared->keepalive = opts->keepalive;
 
+    if (flags & NGX_DYNAMIC_UPDATE_OPT_PORT)
+        conf->shared->port = opts->port;
     if (flags & NGX_DYNAMIC_UPDATE_OPT_TYPE)
         conf->shared->type = sh.type;
     if (flags & NGX_DYNAMIC_UPDATE_OPT_URI)
@@ -332,6 +334,11 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
 
     lua_pushinteger(L, opts->keepalive);
     lua_setfield(L, -2, "keepalive");
+
+    if (opts->port) {
+        lua_pushinteger(L, opts->port);
+        lua_setfield(L, -2, "port");
+    }
 
     if (opts->request_uri.len != 0 || opts->request_body.len != 0) {
         lua_newtable(L);
@@ -500,7 +507,6 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
     ngx_dynamic_healthcheck_opts_t  opts;
     ngx_slab_pool_t                *slab = conf->peers.shared->slab;
     ngx_uint_t                      i;
-    ngx_flag_t                      is_http;
     int                             top = lua_gettop(L);
     ngx_http_request_t             *r;
     ngx_flag_t                      flags = 0;
@@ -509,9 +515,6 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
     r = ngx_http_lua_get_req(L);
     if (r == NULL)
         return luaL_error(L, "no request");
-
-    is_http = ngx_strcmp(conf->shared->module.data,
-                         NGX_DH_MODULE_HTTP.data) == 0;
 
     ngx_memzero(&opts, sizeof(ngx_dynamic_healthcheck_opts_t));
 
@@ -533,6 +536,8 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
                                       &flags, NGX_DYNAMIC_UPDATE_OPT_OFF);
     opts.disabled  = get_field_number(L, 2, "disabled",
                                       &flags, NGX_DYNAMIC_UPDATE_OPT_DISABLED);
+    opts.port      = get_field_number(L, 2, "port",
+                                      &flags, NGX_DYNAMIC_UPDATE_OPT_PORT);
 
     opts.fall      = ngx_max(opts.fall, 1);
     opts.rise      = ngx_max(opts.rise, 1);
@@ -554,43 +559,41 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
     opts.request_body   = get_field_string(L, -1, "body",
                                            &flags, NGX_DYNAMIC_UPDATE_OPT_BODY);
 
-    if (is_http) {
-        lua_getfield(L, -1, "headers");
+    lua_getfield(L, -1, "headers");
 
-        if (lua_istable(L, -1)) {
-            lua_pushvalue(L, -1);
-            lua_pushnil(L);
+    if (lua_istable(L, -1)) {
+        lua_pushvalue(L, -1);
+        lua_pushnil(L);
 
-            if (ngx_pool_keyval_array_create(&opts.request_headers,
-                                             100, r->pool) == NGX_ERROR)
+        if (ngx_pool_keyval_array_create(&opts.request_headers,
+                                         100, r->pool) == NGX_ERROR)
+            goto nomem;
+
+        for (i = 0; lua_next(L, -2) && i < 100; i++) {
+            lua_pushvalue(L, -2);
+
+            if (lua_get_pool_string(L,
+                    &opts.request_headers.data[i].key,
+                    r->pool, -1) == NGX_ERROR)
+                goto nomem;
+            if (lua_get_pool_string(L,
+                    &opts.request_headers.data[i].value,
+                    r->pool, -2) == NGX_ERROR)
                 goto nomem;
 
-            for (i = 0; lua_next(L, -2) && i < 100; i++) {
-                lua_pushvalue(L, -2);
-
-                if (lua_get_pool_string(L,
-                        &opts.request_headers.data[i].key,
-                        r->pool, -1) == NGX_ERROR)
-                    goto nomem;
-                if (lua_get_pool_string(L,
-                        &opts.request_headers.data[i].value,
-                        r->pool, -2) == NGX_ERROR)
-                    goto nomem;
-
-                lua_pop(L, 2);
-                opts.request_headers.len++;
-            }
-
-            lua_pop(L, 1);
-
-            opts.request_headers.reserved =
-                ngx_min(opts.request_headers.reserved,
-                        opts.request_headers.len * 2);
-            flags |= NGX_DYNAMIC_UPDATE_OPT_HEADERS;
+            lua_pop(L, 2);
+            opts.request_headers.len++;
         }
 
-        lua_pop(L, 1);  // headers
+        lua_pop(L, 1);
+
+        opts.request_headers.reserved =
+            ngx_min(opts.request_headers.reserved,
+                    opts.request_headers.len * 2);
+        flags |= NGX_DYNAMIC_UPDATE_OPT_HEADERS;
     }
+
+    lua_pop(L, 1);  // headers
 
     lua_getfield(L, -1, "expected");
 
@@ -602,41 +605,38 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
     opts.response_body = get_field_string(L, -1, "body",
                                   &flags, NGX_DYNAMIC_UPDATE_OPT_RESPONSE_BODY);
 
-    if (is_http) {
-        lua_getfield(L, -1, "codes");
+    lua_getfield(L, -1, "codes");
 
-        if (lua_istable(L, -1)) {
-            lua_pushvalue(L, -1);
-            lua_pushnil(L);
+    if (lua_istable(L, -1)) {
+        lua_pushvalue(L, -1);
+        lua_pushnil(L);
 
-            if (ngx_pool_num_array_create(&opts.response_codes, 100,
-                                          r->pool) == NGX_ERROR)
-                goto nomem;
+        if (ngx_pool_num_array_create(&opts.response_codes, 100,
+                                      r->pool) == NGX_ERROR)
+            goto nomem;
 
-            for (i = 0; lua_next(L, -2) && i < 100; i++) {
-                lua_pushvalue(L, -2);
+        for (i = 0; lua_next(L, -2) && i < 100; i++) {
+            lua_pushvalue(L, -2);
 
-                if (lua_isnumber(L, -2))
-                    opts.response_codes.data[i] = lua_tointeger(L, -2);
-                else {
-                    s.data = (u_char *) lua_tolstring(L, -2, &s.len);
-                    opts.response_codes.data[i] = ngx_atoi(s.data, s.len);
-                }
-
-                lua_pop(L, 2);
-                opts.response_codes.len++;
+            if (lua_isnumber(L, -2))
+                opts.response_codes.data[i] = lua_tointeger(L, -2);
+            else {
+                s.data = (u_char *) lua_tolstring(L, -2, &s.len);
+                opts.response_codes.data[i] = ngx_atoi(s.data, s.len);
             }
 
-            lua_pop(L, 1);
-
-            opts.response_codes.reserved = ngx_min(opts.response_codes.reserved,
-                                                   opts.response_codes.len * 2);
-            flags |= NGX_DYNAMIC_UPDATE_OPT_RESPONSE_CODES;
+            lua_pop(L, 2);
+            opts.response_codes.len++;
         }
 
-        lua_pop(L, 1);  // codes
+        lua_pop(L, 1);
+
+        opts.response_codes.reserved = ngx_min(opts.response_codes.reserved,
+                                               opts.response_codes.len * 2);
+        flags |= NGX_DYNAMIC_UPDATE_OPT_RESPONSE_CODES;
     }
 
+    lua_pop(L, 1);      // codes
     lua_pop(L, 1);      // expected
     lua_pop(L, 1);      // command
 
@@ -996,7 +996,12 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
                                                     "response_body:\"%V\"" LF
                                                     "off:%d"               LF
                                                     "disabled:%d"          LF
-                                                    "disabled_hosts:%V"    LF,
+                                                    "disabled_hosts:%V"    LF
+                                                    "port:%d"              LF
+                                                    "request_uri:%V"       LF
+                                                    "request_method:%V"    LF
+                                                    "request_headers:%V"   LF
+                                                    "response_codes:%V"    LF,
                                &shared->type,
                                shared->fall,
                                shared->rise,
@@ -1007,24 +1012,15 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
                                nvl_str(&shared->response_body),
                                shared->off,
                                shared->disabled,
-                               &hosts) - content.data;
+                               &hosts,
+                               shared->port,
+                               nvl_str(&shared->request_uri),
+                               nvl_str(&shared->request_method),
+                               &headers,
+                               &codes) - content.data;
 
     if (content.len == 10240)
         goto nomem;
-
-    if (ngx_strncmp(shared->module.data, "http", 3) == 0) {
-        content.len = ngx_snprintf(content.data + content.len,
-                                   10240 - content.len, "request_uri:%V"     LF
-                                                        "request_method:%V"  LF
-                                                        "request_headers:%V" LF
-                                                        "response_codes:%V"  LF,
-                                   nvl_str(&shared->request_uri),
-                                   nvl_str(&shared->request_method),
-                                   &headers,
-                                   &codes) - content.data;
-        if (content.len == 10240)
-            goto nomem;
-    }
 
     if (fwrite(content.data, content.len, 1, f) == 0)
         ngx_log_error(NGX_LOG_CRIT, log, errno, "healthcheck: failed to save");
@@ -1156,7 +1152,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     ngx_slab_pool_t                 *slab;
     const char                      *sep;
 
-    static ngx_str_t re_http =
+    static ngx_str_t re =
         ngx_string("type:([^\n]+)"                LF
                    "fall:(\\d+)"                  LF
                    "rise:(\\d+)"                  LF
@@ -1168,22 +1164,11 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
                    "off:(\\d+)"                   LF
                    "disabled:(\\d+)"              LF
                    "disabled_hosts:([^\n]*)"      LF
+                   "port:(\\d+)"                  LF
                    "request_uri:([^\n]*)"         LF
                    "request_method:([^\n]*)"      LF
                    "request_headers:([^\n]*)"     LF
                    "response_codes:([^\n]*)"      LF);
-    static ngx_str_t re_tcp =
-        ngx_string("type:([^\n]+)"                LF
-                   "fall:(\\d+)"                  LF
-                   "rise:(\\d+)"                  LF
-                   "timeout:(\\d+)"               LF
-                   "interval:(\\d+)"              LF
-                   "keepalive:(\\d+)"             LF
-                   "request_body:\"([^\"]*)\""    LF
-                   "response_body:\"([^\"]*)\""   LF
-                   "off:(\\d+)"                   LF
-                   "disabled:(\\d+)"              LF
-                   "disabled_hosts:([^\n]*)"      LF);
 
     ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
@@ -1192,10 +1177,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     rc.pool = pool;
     rc.options = PCRE_UNGREEDY;
 
-    if (ngx_strncmp(shared->module.data, "http", 3) == 0)
-        rc.pattern = re_http;
-    else
-        rc.pattern = re_tcp;
+    rc.pattern = re;
 
     if (ngx_regex_compile(&rc) != NGX_OK) {
         ngx_log_error(NGX_LOG_CRIT, log, 0, "healthcheck: %V", &rc.err);
@@ -1269,75 +1251,75 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
                                slab) != NGX_OK)
         goto nomem;
 
-    if (ngx_strncmp(shared->module.data, "http", 3) == 0) {
-        if (ngx_shm_str_copy(&shared->request_uri,
-                             temp_str(content->data + capt[24],
-                                      capt[25] - capt[24], &temp),
-                             slab) != NGX_OK)
-            goto nomem;
+    shared->port = ngx_atoi(content->data + capt[24], capt[25] - capt[24]);
 
-        if (ngx_shm_str_copy(&shared->request_method,
-                             temp_str(content->data + capt[26],
-                                      capt[27] - capt[26], &temp),
-                             slab) != NGX_OK)
-            goto nomem;
+    if (ngx_shm_str_copy(&shared->request_uri,
+                         temp_str(content->data + capt[26],
+                                  capt[27] - capt[26], &temp),
+                         slab) != NGX_OK)
+        goto nomem;
 
-        // request_headers
+    if (ngx_shm_str_copy(&shared->request_method,
+                         temp_str(content->data + capt[28],
+                                  capt[29] - capt[28], &temp),
+                         slab) != NGX_OK)
+        goto nomem;
 
-        headers.data = (ngx_keyval_t *) ngx_pcalloc(pool,
-            100 * sizeof(ngx_keyval_t));
-        if (headers.data == NULL)
-            goto nomem;
-        headers.reserved = 100;
-        headers.len = 0;
+    // request_headers
 
-        temp_str(content->data + capt[28], capt[29] - capt[28], &temp);
-        temp.data[temp.len] = 0;
+    headers.data = (ngx_keyval_t *) ngx_pcalloc(pool,
+        100 * sizeof(ngx_keyval_t));
+    if (headers.data == NULL)
+        goto nomem;
+    headers.reserved = 100;
+    headers.len = 0;
 
-        for (sep = ngx_strchr(temp.data, '|');
-             sep && headers.len < 100;
-             sep = ngx_strchr(temp.data, '|')) {
-            ngx_keyval_t kv;
-            kv.key.data = temp.data;
-            kv.key.len = (u_char *) ngx_strchr(kv.key.data, ':') - kv.key.data;
-            kv.key.data[kv.key.len] = 0;
-            kv.value.data = kv.key.data + kv.key.len + 1;
-            kv.value.len = (u_char *) sep - kv.value.data;
-            kv.value.data[kv.value.len] = 0;
-            headers.data[headers.len++] = kv;
-            temp.data = (u_char *) sep + 1;
-        }
+    temp_str(content->data + capt[30], capt[31] - capt[30], &temp);
+    temp.data[temp.len] = 0;
 
-        headers.reserved = ngx_min(headers.len * 2, headers.reserved);
-        if (ngx_shm_keyval_array_copy(&shared->request_headers, &headers,
-                                      slab) != NGX_OK)
-            goto nomem;
-
-        // response_codes
-
-        codes.data = (ngx_int_t *) ngx_pcalloc(pool,
-            100 * sizeof(ngx_int_t));
-        if (codes.data == NULL)
-            goto nomem;
-        codes.reserved = 100;
-        codes.len = 0;
-
-        temp_str(content->data + capt[30], capt[31] - capt[30], &temp);
-        temp.data[temp.len] = 0;
-
-        for (sep = ngx_strchr(temp.data, '|');
-             sep && codes.len < 100;
-             sep = ngx_strchr(temp.data, '|')) {
-            codes.data[codes.len++] = ngx_atoi(temp.data,
-                                               (u_char *) sep - temp.data);
-            temp.data = (u_char *) sep + 1;
-        }
-
-        codes.reserved = ngx_min(codes.len * 2, codes.reserved);
-        if (ngx_shm_num_array_copy(&shared->response_codes, &codes,
-                                   slab) != NGX_OK)
-            goto nomem;
+    for (sep = ngx_strchr(temp.data, '|');
+         sep && headers.len < 100;
+         sep = ngx_strchr(temp.data, '|')) {
+        ngx_keyval_t kv;
+        kv.key.data = temp.data;
+        kv.key.len = (u_char *) ngx_strchr(kv.key.data, ':') - kv.key.data;
+        kv.key.data[kv.key.len] = 0;
+        kv.value.data = kv.key.data + kv.key.len + 1;
+        kv.value.len = (u_char *) sep - kv.value.data;
+        kv.value.data[kv.value.len] = 0;
+        headers.data[headers.len++] = kv;
+        temp.data = (u_char *) sep + 1;
     }
+
+    headers.reserved = ngx_min(headers.len * 2, headers.reserved);
+    if (ngx_shm_keyval_array_copy(&shared->request_headers, &headers,
+                                  slab) != NGX_OK)
+        goto nomem;
+
+    // response_codes
+
+    codes.data = (ngx_int_t *) ngx_pcalloc(pool,
+        100 * sizeof(ngx_int_t));
+    if (codes.data == NULL)
+        goto nomem;
+    codes.reserved = 100;
+    codes.len = 0;
+
+    temp_str(content->data + capt[32], capt[33] - capt[32], &temp);
+    temp.data[temp.len] = 0;
+
+    for (sep = ngx_strchr(temp.data, '|');
+         sep && codes.len < 100;
+         sep = ngx_strchr(temp.data, '|')) {
+        codes.data[codes.len++] = ngx_atoi(temp.data,
+                                           (u_char *) sep - temp.data);
+        temp.data = (u_char *) sep + 1;
+    }
+
+    codes.reserved = ngx_min(codes.len * 2, codes.reserved);
+    if (ngx_shm_num_array_copy(&shared->response_codes, &codes,
+                               slab) != NGX_OK)
+        goto nomem;
 
     return NGX_OK;
 

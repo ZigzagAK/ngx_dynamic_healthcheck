@@ -60,6 +60,7 @@ struct ngx_dynamic_healthcheck_opts_s {
     ngx_str_t                request_body;
     ngx_num_array_t          response_codes;
     ngx_str_t                response_body;
+    ngx_uint_t               port;
     ngx_flag_t               off;
     ngx_str_array_t          disabled_hosts_global;
     ngx_str_array_t          disabled_hosts;

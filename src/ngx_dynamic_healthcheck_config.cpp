@@ -41,16 +41,10 @@ ngx_dynamic_healthcheck_check(ngx_conf_t *cf, ngx_command_t *cmd,
             type.data = arg.data + 5;
             type.len = arg.len - 5;
 
-            if (conf->config.module.data == NGX_DH_MODULE_HTTP.data) {
-                if (ngx_strncmp("http", type.data, type.len) != 0
-                    && ngx_strncmp("tcp", type.data, type.len) != 0
-                    && ngx_strncmp("ssl", type.data, type.len) != 0)
+            if (ngx_strncmp("http", type.data, type.len) != 0
+                && ngx_strncmp("tcp", type.data, type.len) != 0
+                && ngx_strncmp("ssl", type.data, type.len) != 0)
                 goto fail;
-            } else {
-                if (ngx_strncmp("tcp", type.data, type.len) != 0
-                    && ngx_strncmp("ssl", type.data, type.len) != 0)
-                goto fail;
-            }
 
             conf->config.type = type;
 
@@ -98,6 +92,15 @@ ngx_dynamic_healthcheck_check(ngx_conf_t *cf, ngx_command_t *cmd,
             conf->config.keepalive = ngx_atoi(arg.data + 10, arg.len - 10);
 
             if (conf->config.keepalive == 0)
+                goto fail;
+
+            continue;
+        }
+
+        if (ngx_is_arg("port=", arg)) {
+            conf->config.port = ngx_atoi(arg.data + 5, arg.len - 5);
+
+            if (conf->config.port > 65535)
                 goto fail;
 
             continue;

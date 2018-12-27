@@ -73,6 +73,27 @@ static ngx_command_t ngx_stream_dynamic_healthcheck_commands[] = {
       0,
       NULL },
 
+    { ngx_string("check_request_uri"),
+      NGX_STREAM_UPS_CONF|NGX_CONF_TAKE2,
+      ngx_http_dynamic_healthcheck_check_request_uri,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("check_request_headers"),
+      NGX_STREAM_UPS_CONF|NGX_CONF_1MORE,
+      ngx_http_dynamic_healthcheck_check_request_headers,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("check_response_codes"),
+      NGX_STREAM_UPS_CONF|NGX_CONF_1MORE,
+      ngx_http_dynamic_healthcheck_check_response_codes,
+      NGX_STREAM_SRV_CONF_OFFSET,
+      0,
+      NULL },
+
     { ngx_string("check_request_body"),
       NGX_STREAM_UPS_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot,
@@ -129,15 +150,13 @@ static void *
 ngx_stream_dynamic_healthcheck_create_conf(ngx_conf_t *cf);
 
 
-static ngx_http_module_t ngx_stream_dynamic_healthcheck_ctx = {
+static ngx_stream_module_t ngx_stream_dynamic_healthcheck_ctx = {
     NULL,                                            /* preconfiguration  */
     ngx_stream_dynamic_healthcheck_post_conf,        /* postconfiguration */
     ngx_stream_dynamic_healthcheck_create_conf,      /* create main       */
     ngx_stream_dynamic_healthcheck_init_main_conf,   /* init main         */
     ngx_stream_dynamic_healthcheck_create_conf,      /* create server     */
-    NULL,                                            /* merge server      */
-    NULL,                                            /* create location   */
-    NULL                                             /* merge location    */
+    NULL                                             /* merge server      */
 };
 
 
@@ -287,10 +306,8 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
     conf = (ngx_dynamic_healthcheck_conf_t *)
         ngx_stream_conf_upstream_srv_conf(uscf,
             ngx_stream_dynamic_healthcheck_module);
-    
+
     ngx_conf_merge_str_value(conf->config.type, main_conf->config.type);
-    ngx_conf_merge_uint_value(conf->config.keepalive,
-        main_conf->config.keepalive, 1);
     ngx_conf_merge_str_value(conf->config.request_body,
         main_conf->config.request_body);
     ngx_conf_merge_str_value(conf->config.response_body,
@@ -301,6 +318,19 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
         main_conf->config.disabled_hosts);
     ngx_conf_merge_str_value(conf->config.persistent,
         main_conf->config.persistent);
+
+    if (conf->config.type.data != NULL
+        && ngx_strncmp(conf->config.type.data, "http", 4) == 0)
+        if (conf->config.request_uri.len == 0) {
+            ngx_str_null(&conf->config.request_method);
+            ngx_memzero(&conf->config.request_headers,
+                        sizeof(ngx_keyval_array_t));
+            ngx_str_null(&conf->config.request_body);
+            ngx_str_null(&conf->config.response_body);
+
+            conf->config.keepalive = 1;
+            ngx_memzero(&conf->config.response_codes, sizeof(ngx_num_array_t));
+        }
 
     conf->config.buffer_size = main_conf->config.buffer_size;
     conf->config.disabled_hosts_global =

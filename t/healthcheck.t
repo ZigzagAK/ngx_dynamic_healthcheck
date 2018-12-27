@@ -266,5 +266,3 @@ u1 tcp 2 1 1500 60
     GET /test
 --- response_body_like
 u1 ssl 2 1 1500 60
-
-

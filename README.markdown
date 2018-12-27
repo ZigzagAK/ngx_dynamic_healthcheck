@@ -196,12 +196,16 @@ Individual upstream parameters
 
 check
 -----
-* **syntax**: `check fall=2 rise=2 timeout=1000 interval=10 keepalive=10 type=http|tcp|ssl`
+* **syntax**: `check fall=2 rise=2 timeout=1000 interval=10 keepalive=10 type=http|tcp|ssl port=<other check port>`
 * **default**: `none`
 * **context**: `upstream`
 
 Configure healthcheck base parameters.
-If `interval` is 0 - no healthcheks for this upstream.
+If `interval` is 0 - no healthcheks for this upstream.  
+If you want change default port (got from upstream peer) you may override it with `port=xxx` parameter.  
+For example: Your service is responsible on port A and working by TCP binary protocol and you have another port opened by HTTP and returns healthcheck status.
+In this case you may override peer port with separate HTTP port and setup check_request_uri and check_response_codes, check_response_body parameters.
+Peer port in this case will not be check because healthcheck may be accessed on separate HTTP port.
 
 check_request_uri
 -----------------

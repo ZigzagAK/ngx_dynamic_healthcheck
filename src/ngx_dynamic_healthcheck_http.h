@@ -11,6 +11,15 @@
 extern "C" ngx_int_t
 ngx_http_read_header(ngx_http_request_t *r, ngx_buf_t *buf, ngx_keyval_t *h);
 
+ngx_inline in_port_t
+get_in_port(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return ntohs(((struct sockaddr_in*)sa)->sin_port);
+    }
+
+    return ntohs(((struct sockaddr_in6*)sa)->sin6_port);
+}
 
 template <class PeerT> class ngx_dynamic_healthcheck_http :
     public ngx_dynamic_healthcheck_tcp<PeerT>
@@ -31,6 +40,7 @@ protected:
         ngx_connection_t                *c = state->pc.connection;
         ngx_uint_t                       i;
         ngx_dynamic_healthcheck_opts_t  *shared = this->shared;
+        ngx_str_t                        host;
 
         buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
             "%V %V HTTP/1.%s\r\n",
@@ -39,9 +49,14 @@ protected:
             shared->keepalive > c->requests + 1 ? "1" : "0");
 
         if (state->server.len >= 5
-            && ngx_strncmp(state->server.data, "unix:", 5) != 0)
+            && ngx_strncmp(state->server.data, "unix:", 5) != 0) {
+            host = state->name.str;
+            for (; host.len > 0 && host.data[host.len - 1] != ':';
+                   host.len--);
+            host.len--;
             buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
-                "Host: %V\r\n", &state->name.str);
+                "Host: %V:%d\r\n", &host, get_in_port(state->sockaddr));
+        }
 
         buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
             "User-Agent: nginx/"NGINX_VERSION"\r\n"
