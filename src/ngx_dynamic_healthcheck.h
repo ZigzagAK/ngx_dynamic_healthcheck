@@ -71,6 +71,7 @@ struct ngx_dynamic_healthcheck_opts_s {
     ngx_str_t                persistent;
     ngx_flag_t               updated;
     ngx_int_t                loaded;
+    ngx_flag_t               passive;
     ngx_dynamic_hc_shared_t  state;
 };
 typedef struct ngx_dynamic_healthcheck_opts_s

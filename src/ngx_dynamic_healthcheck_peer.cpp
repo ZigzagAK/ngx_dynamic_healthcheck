@@ -622,6 +622,8 @@ ngx_dynamic_healthcheck_peer::check()
 {
     static const ngx_str_t skip_addr = ngx_string("0.0.0.0");
 
+    ngx_time_t  *tp = ngx_timeofday();
+
     ngx_str_array_t hosts[2] = {
         opts->disabled_hosts_global,
         opts->disabled_hosts
@@ -630,6 +632,9 @@ ngx_dynamic_healthcheck_peer::check()
 
     if (opts->disabled)
         goto disabled;
+
+    if (state.shared->checked + opts->interval > tp->sec)
+        goto end;
 
     if (name.len >= skip_addr.len
         && ngx_memcmp(name.data, skip_addr.data, skip_addr.len) == 0) {
@@ -672,17 +677,15 @@ disabled:
     close();
     down();
 
-    this->~ngx_dynamic_healthcheck_peer();
-
-    ngx_free(this);
-
-    return;
+    goto end;
 
 excluded:
 
     ngx_log_debug4(NGX_LOG_DEBUG_HTTP, event->log, 0,
                    "[%V] %V: %V addr=%V exclude",
                    &module, &upstream, &server, &name);
+
+end:
 
     this->~ngx_dynamic_healthcheck_peer();
 
@@ -691,7 +694,11 @@ excluded:
 
 
 ngx_dynamic_healthcheck_peer::~ngx_dynamic_healthcheck_peer()
-{}
+{
+    ngx_time_t  *tp = ngx_timeofday();
+    if (state.shared->checked + opts->interval <= tp->sec)
+        state.shared->checked = tp->sec;
+}
 
 
 ngx_int_t

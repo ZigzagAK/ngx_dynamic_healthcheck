@@ -276,3 +276,27 @@ again:
 
     ngx_shmtx_unlock(&slab->mutex);
 }
+
+
+void
+ngx_dynamic_healthcheck_state_checked(ngx_dynamic_hc_state_t *state,
+    ngx_str_t *name)
+{
+    ngx_dynamic_hc_shared_node_t  *shared;
+    uint32_t                       hash;
+    ngx_rbtree_t                  *rbtree = &state->shared->rbtree;
+    ngx_slab_pool_t               *slab = state->shared->slab;
+    ngx_time_t                    *tp = ngx_timeofday();
+
+    hash = ngx_crc32_short(name->data, name->len);
+
+    ngx_shmtx_lock(&slab->mutex);
+
+    shared = (ngx_dynamic_hc_shared_node_t *)
+        ngx_str_rbtree_lookup(rbtree, name, hash);
+
+    if (shared != NULL)
+        shared->checked = tp->sec;
+
+    ngx_shmtx_unlock(&slab->mutex);
+}

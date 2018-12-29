@@ -41,6 +41,7 @@ extern "C" {
 #define NGX_DYNAMIC_UPDATE_OPT_OFF              4096
 #define NGX_DYNAMIC_UPDATE_OPT_DISABLED         8192
 #define NGX_DYNAMIC_UPDATE_OPT_PORT            16384
+#define NGX_DYNAMIC_UPDATE_OPT_PASSIVE         32768
 
 
 class ngx_dynamic_healthcheck_api_base {
@@ -561,7 +562,7 @@ public:
             }
 
             if (!conf->shared->updated
-                && conf->shared->last + conf->shared->interval * 1000 > now)
+                && conf->shared->last + 5000 > now)
                 goto next;
 
             persistent = conf->config.persistent.len != 0 &&

@@ -276,8 +276,42 @@ ngx_stream_dynamic_healthcheck_create_module(lua_State *L);
 
 
 static ngx_int_t
+ngx_http_dynamic_healthcheck_touch(ngx_http_request_t *r)
+{
+    ngx_dynamic_healthcheck_conf_t  *uscf;
+    ngx_http_upstream_state_t       *state;
+
+    if (r->upstream == NULL || r->upstream->upstream == NULL)
+        return NGX_OK;
+
+    uscf = (ngx_dynamic_healthcheck_conf_t *)
+        ngx_http_conf_upstream_srv_conf(r->upstream->upstream,
+            ngx_http_dynamic_healthcheck_module);
+
+    if (uscf == NULL || uscf->shared == NULL)
+        return NGX_OK;
+
+    if (!uscf->shared->passive)
+        return NGX_OK;
+
+    state = r->upstream->state;
+
+    if (state == NULL || state->peer == NULL)
+        return NGX_OK;
+
+    if (state->status < NGX_HTTP_SPECIAL_RESPONSE)
+        ngx_dynamic_healthcheck_state_checked(&uscf->peers, state->peer);
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
 ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf)
 {
+    ngx_http_core_main_conf_t   *mcf;
+    ngx_http_handler_pt         *handler;
+
     if (ngx_http_lua_add_package_preload(cf, "ngx.healthcheck",
         ngx_http_dynamic_healthcheck_create_module) != NGX_OK)
         return NGX_ERROR;
@@ -286,6 +320,16 @@ ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf)
         ngx_stream_dynamic_healthcheck_create_module) != NGX_OK)
         return NGX_ERROR;
 
+    mcf = (ngx_http_core_main_conf_t *)
+        ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+
+    handler = (ngx_http_handler_pt *)
+        ngx_array_push(&mcf->phases[NGX_HTTP_LOG_PHASE].handlers);
+    if (handler == NULL)
+        return NGX_ERROR;
+
+    *handler = ngx_http_dynamic_healthcheck_touch;
+    
     return NGX_OK;
 }
 
@@ -372,6 +416,8 @@ ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
     ngx_conf_merge_str_value(conf->config.type, main_conf->config.type);
     ngx_conf_merge_uint_value(conf->config.keepalive,
         main_conf->config.keepalive, 1);
+    ngx_conf_merge_value(conf->config.passive,
+        main_conf->config.passive, 0);
     ngx_conf_merge_str_value(conf->config.request_uri,
         main_conf->config.request_uri);
     ngx_conf_merge_str_value(conf->config.request_method,
@@ -609,6 +655,7 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
             "%V    \"timeout\":%d,"               CRLF
             "%V    \"type\":\"%V\","              CRLF
             "%V    \"port\":%d,"                  CRLF
+            "%V    \"passive\":%d,"               CRLF
             "%V    \"command\":{"                 CRLF,
                 &tab, shared->rise,
                 &tab, shared->fall,
@@ -617,6 +664,7 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
                 &tab, shared->timeout,
                 &tab, &shared->type,
                 &tab, shared->port,
+                &tab, shared->passive,
                 &tab);
 
         if (is_http) {
@@ -873,6 +921,7 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
     ngx_http_variable_value_t      *enable_host;
     ngx_http_variable_value_t      *disable;
     ngx_http_variable_value_t      *port;
+    ngx_http_variable_value_t      *passive;
     u_char                         *c, *s;
 
     extern ngx_str_t NGX_DH_MODULE_STREAM;
@@ -886,6 +935,7 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
     interval        = get_arg(r, "arg_interval");
     keepalive       = get_arg(r, "arg_keepalive");
     port            = get_arg(r, "arg_port");
+    passive         = get_arg(r, "arg_passive");
     request_uri     = get_arg(r, "arg_request_uri");
     request_method  = get_arg(r, "arg_request_method");
     request_headers = get_arg(r, "arg_request_headers");
@@ -919,6 +969,8 @@ ngx_http_dynamic_healthcheck_update(ngx_http_request_t *r)
                             &flags, NGX_DYNAMIC_UPDATE_OPT_KEEPALIVE);
     set_num_opt<ngx_uint_t>(port, &opts.port,
                             &flags, NGX_DYNAMIC_UPDATE_OPT_PORT);
+    set_num_opt<ngx_flag_t>(passive, &opts.passive,
+                            &flags, NGX_DYNAMIC_UPDATE_OPT_PASSIVE);
     set_str_opt(request_uri, &opts.request_uri,
                 &flags, NGX_DYNAMIC_UPDATE_OPT_URI);
     set_str_opt(request_method, &opts.request_method,

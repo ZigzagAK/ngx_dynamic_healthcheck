@@ -323,6 +323,7 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
     sh->interval  = opts->interval;
     sh->keepalive = opts->keepalive;
     sh->port      = opts->port;
+    sh->passive   = opts->passive;
     sh->updated   = 1;
 
     b = b && NGX_OK == ngx_shm_str_copy(&sh->module, &opts->module, slab);

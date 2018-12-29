@@ -226,6 +226,8 @@ ngx_dynamic_healthcheck_api_base::do_update
 
     if (flags & NGX_DYNAMIC_UPDATE_OPT_PORT)
         conf->shared->port = opts->port;
+    if (flags & NGX_DYNAMIC_UPDATE_OPT_PASSIVE)
+        conf->shared->passive = opts->passive;
     if (flags & NGX_DYNAMIC_UPDATE_OPT_TYPE)
         conf->shared->type = sh.type;
     if (flags & NGX_DYNAMIC_UPDATE_OPT_URI)
@@ -338,6 +340,11 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
     if (opts->port) {
         lua_pushinteger(L, opts->port);
         lua_setfield(L, -2, "port");
+    }
+
+    if (opts->passive) {
+        lua_pushboolean(L, opts->port);
+        lua_setfield(L, -2, "passive");
     }
 
     if (opts->request_uri.len != 0 || opts->request_body.len != 0) {
@@ -538,6 +545,8 @@ ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
                                       &flags, NGX_DYNAMIC_UPDATE_OPT_DISABLED);
     opts.port      = get_field_number(L, 2, "port",
                                       &flags, NGX_DYNAMIC_UPDATE_OPT_PORT);
+    opts.passive   = get_field_number(L, 2, "passive",
+                                      &flags, NGX_DYNAMIC_UPDATE_OPT_PASSIVE);
 
     opts.fall      = ngx_max(opts.fall, 1);
     opts.rise      = ngx_max(opts.rise, 1);
@@ -998,6 +1007,7 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
                                                     "disabled:%d"          LF
                                                     "disabled_hosts:%V"    LF
                                                     "port:%d"              LF
+                                                    "passive:%d"           LF
                                                     "request_uri:%V"       LF
                                                     "request_method:%V"    LF
                                                     "request_headers:%V"   LF
@@ -1014,6 +1024,7 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
                                shared->disabled,
                                &hosts,
                                shared->port,
+                               shared->passive,
                                nvl_str(&shared->request_uri),
                                nvl_str(&shared->request_method),
                                &headers,
@@ -1165,6 +1176,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
                    "disabled:(\\d+)"              LF
                    "disabled_hosts:([^\n]*)"      LF
                    "port:(\\d+)"                  LF
+                   "passive:(\\d+)"               LF
                    "request_uri:([^\n]*)"         LF
                    "request_method:([^\n]*)"      LF
                    "request_headers:([^\n]*)"     LF
@@ -1252,16 +1264,17 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
         goto nomem;
 
     shared->port = ngx_atoi(content->data + capt[24], capt[25] - capt[24]);
+    shared->passive = ngx_atoi(content->data + capt[26], capt[27] - capt[26]);
 
     if (ngx_shm_str_copy(&shared->request_uri,
-                         temp_str(content->data + capt[26],
-                                  capt[27] - capt[26], &temp),
+                         temp_str(content->data + capt[28],
+                                  capt[29] - capt[28], &temp),
                          slab) != NGX_OK)
         goto nomem;
 
     if (ngx_shm_str_copy(&shared->request_method,
-                         temp_str(content->data + capt[28],
-                                  capt[29] - capt[28], &temp),
+                         temp_str(content->data + capt[30],
+                                  capt[31] - capt[30], &temp),
                          slab) != NGX_OK)
         goto nomem;
 
@@ -1274,7 +1287,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     headers.reserved = 100;
     headers.len = 0;
 
-    temp_str(content->data + capt[30], capt[31] - capt[30], &temp);
+    temp_str(content->data + capt[32], capt[33] - capt[32], &temp);
     temp.data[temp.len] = 0;
 
     for (sep = ngx_strchr(temp.data, '|');
@@ -1305,7 +1318,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     codes.reserved = 100;
     codes.len = 0;
 
-    temp_str(content->data + capt[32], capt[33] - capt[32], &temp);
+    temp_str(content->data + capt[34], capt[35] - capt[34], &temp);
     temp.data[temp.len] = 0;
 
     for (sep = ngx_strchr(temp.data, '|');

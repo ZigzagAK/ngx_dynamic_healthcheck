@@ -308,6 +308,8 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
             ngx_stream_dynamic_healthcheck_module);
 
     ngx_conf_merge_str_value(conf->config.type, main_conf->config.type);
+    ngx_conf_merge_value(conf->config.passive,
+        main_conf->config.passive, 0);
     ngx_conf_merge_str_value(conf->config.request_body,
         main_conf->config.request_body);
     ngx_conf_merge_str_value(conf->config.response_body,

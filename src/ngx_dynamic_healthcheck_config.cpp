@@ -110,6 +110,11 @@ ngx_dynamic_healthcheck_check(ngx_conf_t *cf, ngx_command_t *cmd,
             conf->config.off = 1;
             continue;
         }
+
+        if (ngx_strcmp(arg.data, "passive") == 0) {
+            conf->config.passive = 1;
+            continue;
+        }
     }
 
     if (conf->config.type.len == 0) {
