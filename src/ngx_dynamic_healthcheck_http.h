@@ -110,11 +110,11 @@ tcp:
         ngx_uint_t                       i;
         ngx_dynamic_healthcheck_opts_t  *shared = this->shared;
 
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, state->pc.connection->log, 0,
-                       "[%V] %V: %V addr=%V, fd=%d http on_recv() %s",
-                       &this->module, &this->upstream,
-                       &this->server, &this->name, c->fd,
-                       body.start == NULL ? "start" : "continue");
+        ngx_log_error(NGX_LOG_DEBUG, state->pc.connection->log, 0,
+                      "[%V] %V: %V addr=%V, fd=%d http on_recv() %s",
+                      &this->module, &this->upstream,
+                      &this->server, &this->name, c->fd,
+                      body.start == NULL ? "start" : "continue");
 
         if (body.start != NULL)
             goto recv_body;
@@ -251,13 +251,13 @@ well_done:
         s.len = body.last - body.start;
 
         if (s.len) {
-            ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
-                           state->pc.connection->log, 0,
-                           "[%V] %V: %V addr=%V, fd=%d "
-                           "http on_recv() body:\n%V",
-                           &this->module, &this->upstream,
-                           &this->server, &this->name, c->fd,
-                           &s);
+            ngx_log_error(NGX_LOG_DEBUG,
+                          state->pc.connection->log, 0,
+                          "[%V] %V: %V addr=%V, fd=%d "
+                          "http on_recv() body:\n%V",
+                          &this->module, &this->upstream,
+                          &this->server, &this->name, c->fd,
+                          &s);
         }
 
         if (shared->response_codes.len) {
@@ -278,21 +278,21 @@ well_done:
             switch(ngx_dynamic_healthcheck_match_buffer(&shared->response_body,
                                                         &s)) {
                 case NGX_OK:
-                    ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                                   "[%V] %V: %V addr=%V, fd=%d http pattern"
-                                   " '%V' found",
-                                   &this->module, &this->upstream,
-                                   &this->server, &this->name,
-                                   c->fd, &shared->response_body);
+                    ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                                  "[%V] %V: %V addr=%V, fd=%d http pattern"
+                                  " '%V' found",
+                                  &this->module, &this->upstream,
+                                  &this->server, &this->name,
+                                  c->fd, &shared->response_body);
                     return NGX_OK;
 
                 case NGX_ERROR:
-                    ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                                   "[%V] %V: %V addr=%V, fd=%d http pattern"
-                                   "'%V' error",
-                                   &this->module, &this->upstream,
-                                   &this->server, &this->name,
-                                   c->fd, &shared->response_body);
+                    ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                                  "[%V] %V: %V addr=%V, fd=%d http pattern"
+                                  "'%V' error",
+                                  &this->module, &this->upstream,
+                                  &this->server, &this->name,
+                                  c->fd, &shared->response_body);
                     return NGX_ERROR;
 
                 case NGX_DECLINED:
@@ -331,12 +331,12 @@ well_done:
         else
             size = c->recv(c, buf->last, remains);
 
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: %V addr=%V, "
-                       "fd=%d http on_recv() recv: %d",
-                       &this->module, &this->upstream,
-                       &this->server, &this->name, c->fd,
-                       size);
+        ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                      "[%V] %V: %V addr=%V, "
+                      "fd=%d http on_recv() recv: %d",
+                      &this->module, &this->upstream,
+                      &this->server, &this->name, c->fd,
+                      size);
 
         if (size == NGX_ERROR)
             return c->read->pending_eof ? NGX_OK : NGX_ERROR;
@@ -357,14 +357,14 @@ well_done:
 
         switch (ngx_http_parse_status_line(&r, state->buf, &status)) {
             case NGX_OK:
-                ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
-                               state->pc.connection->log, 0,
-                               "[%V] %V: %V addr=%V, "
-                               "fd=%d http on_recv() status: %d",
-                               &this->module, &this->upstream,
-                               &this->server, &this->name,
-                               state->pc.connection->fd,
-                               status.code);
+                ngx_log_error(NGX_LOG_DEBUG,
+                              state->pc.connection->log, 0,
+                              "[%V] %V: %V addr=%V, "
+                              "fd=%d http on_recv() status: %d",
+                              &this->module, &this->upstream,
+                              &this->server, &this->name,
+                              state->pc.connection->fd,
+                              status.code);
                 break;
 
             case NGX_AGAIN:
@@ -387,13 +387,13 @@ well_done:
         for (;;) {
             rc = ngx_http_read_header(&r, state->buf, &h);
 
-            ngx_log_debug6(NGX_LOG_DEBUG_HTTP,
-                           state->pc.connection->log, 0,
-                           "[%V] %V: %V addr=%V, fd=%d http"
-                           " on_recv() ngx_http_read_header, rc=%d",
-                           &this->module, &this->upstream,
-                           &this->server, &this->name,
-                           state->pc.connection->fd, rc);
+            ngx_log_error(NGX_LOG_DEBUG,
+                          state->pc.connection->log, 0,
+                          "[%V] %V: %V addr=%V, fd=%d http"
+                          " on_recv() ngx_http_read_header, rc=%d",
+                          &this->module, &this->upstream,
+                          &this->server, &this->name,
+                          state->pc.connection->fd, rc);
 
             if (rc == NGX_OK) {
                 if (ngx_strcmp(h.key.data, "content-length") == 0)
@@ -402,14 +402,14 @@ well_done:
                 if (ngx_strcmp(h.key.data, "transfer-encoding") == 0)
                     chunked = ngx_strcmp(h.value.data, "chunked") == 0;
 
-                ngx_log_debug7(NGX_LOG_DEBUG_HTTP,
-                               state->pc.connection->log, 0,
-                               "[%V] %V: %V addr=%V, "
-                               "fd=%d http on_recv() header: %V=%V",
-                               &this->module, &this->upstream,
-                               &this->server, &this->name,
-                               state->pc.connection->fd,
-                               &h.key, &h.value);
+                ngx_log_error(NGX_LOG_DEBUG,
+                              state->pc.connection->log, 0,
+                              "[%V] %V: %V addr=%V, "
+                              "fd=%d http on_recv() header: %V=%V",
+                              &this->module, &this->upstream,
+                              &this->server, &this->name,
+                              state->pc.connection->fd,
+                              &h.key, &h.value);
                 continue;
             }
 
@@ -475,12 +475,12 @@ again:
                 return NGX_OK;
             }
 
-            ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "[%V] %V: %V addr=%V, fd=%d http"
-                           " on_recv() body chunk, size=%d",
-                           &this->module, &this->upstream,
-                           &this->server, &this->name, c->fd,
-                           remains);
+            ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                          "[%V] %V: %V addr=%V, fd=%d http"
+                          " on_recv() body chunk, size=%d",
+                          &this->module, &this->upstream,
+                          &this->server, &this->name, c->fd,
+                          remains);
 
             if (remains > body.end - body.last - 1) {
                 ngx_log_error(NGX_LOG_WARN, c->log, 0,

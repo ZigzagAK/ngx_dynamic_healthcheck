@@ -47,11 +47,11 @@ protected:
         if (buf->pos == buf->last) {
             tmp.data = buf->start;
             tmp.len = buf->last - buf->start;
-            ngx_log_debug7(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "[%V] %V: %V addr=%V, fd=%d %V request:\n%V",
-                           &this->module, &this->upstream,
-                           &this->server, &this->name, c->fd,
-                           &shared->type, &tmp);
+            ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                          "[%V] %V: %V addr=%V, fd=%d %V request:\n%V",
+                          &this->module, &this->upstream,
+                          &this->server, &this->name, c->fd,
+                          &shared->type, &tmp);
         }
 #endif
 
@@ -71,12 +71,12 @@ protected:
 
         size = c->recv(c, buf->last, buf->end - buf->last);
 
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: %V addr=%V, "
-                       "fd=%d on_recv() recv: %d",
-                       &this->module, &this->upstream,
-                       &this->server, &this->name, c->fd,
-                       size);
+        ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                      "[%V] %V: %V addr=%V, "
+                      "fd=%d on_recv() recv: %d",
+                      &this->module, &this->upstream,
+                      &this->server, &this->name, c->fd,
+                      size);
 
         if (size == NGX_ERROR)
             return NGX_ERROR;
@@ -87,11 +87,11 @@ protected:
         s.data = buf->last;
         s.len = size;
 
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: %V addr=%V, fd=%d received:\n%V",
-                       &this->module, &this->upstream,
-                       &this->server, &this->name,
-                       c->fd, &s);
+        ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                      "[%V] %V: %V addr=%V, fd=%d received:\n%V",
+                      &this->module, &this->upstream,
+                      &this->server, &this->name,
+                      c->fd, &s);
 
         buf->last += size;
 
@@ -101,19 +101,19 @@ protected:
         switch(ngx_dynamic_healthcheck_match_buffer(&shared->response_body,
                                                     &s)) {
             case NGX_OK:
-                ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                               "[%V] %V: %V addr=%V, fd=%d pattern '%V' found",
-                               &this->module, &this->upstream,
-                               &this->server, &this->name,
-                               c->fd, &shared->response_body);
+                ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                              "[%V] %V: %V addr=%V, fd=%d pattern '%V' found",
+                              &this->module, &this->upstream,
+                              &this->server, &this->name,
+                              c->fd, &shared->response_body);
                 return NGX_OK;
 
             case NGX_ERROR:
-                ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                               "[%V] %V: %V addr=%V, fd=%d pattern '%V' error",
-                               &this->module, &this->upstream,
-                               &this->server, &this->name,
-                               c->fd, &shared->response_body);
+                ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                              "[%V] %V: %V addr=%V, fd=%d pattern '%V' error",
+                              &this->module, &this->upstream,
+                              &this->server, &this->name,
+                              c->fd, &shared->response_body);
                 return NGX_ERROR;
 
             case NGX_DECLINED:

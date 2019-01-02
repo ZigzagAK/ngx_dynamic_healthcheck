@@ -91,7 +91,7 @@ protected:
 
         for(i = 0; i < 28; i++)
             sslv3_client_hello_pkt[15 + i] =
-                alphabet[ngx_random() % sizeof(alphabet)];
+                alphabet[ngx_random() % (sizeof(alphabet) - 1)];
 
         s.data = (u_char *) sslv3_client_hello_pkt;
         s.len = sizeof(sslv3_client_hello_pkt);
@@ -122,12 +122,12 @@ protected:
 
         size = c->recv(c, buf->last, buf->end - buf->last);
 
-        ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: %V addr=%V, "
-                       "fd=%d on_recv() recv: %d",
-                       &this->module, &this->upstream,
-                       &this->server, &this->name, c->fd,
-                       size);
+        ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                      "[%V] %V: %V addr=%V, "
+                      "fd=%d on_recv() recv: %d",
+                      &this->module, &this->upstream,
+                      &this->server, &this->name, c->fd,
+                      size);
 
         if (size == NGX_ERROR)
             return NGX_ERROR;
@@ -142,7 +142,7 @@ protected:
 
         hello = (ngx_ssl_server_hello_t *) buf->start;
 
-        ngx_log_debug(NGX_LOG_DEBUG_HTTP, c->log, 0,
+        ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
                       "[%V] %V: %V addr=%V, "
                       "fd=%d ssl on_recv(): type: %ud, version: %ud.%ud, "
                       "length: %ud, handshanke_type: "
