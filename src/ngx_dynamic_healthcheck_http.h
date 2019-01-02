@@ -26,7 +26,7 @@ template <class PeerT> class ngx_dynamic_healthcheck_http :
 {
     ngx_http_request_t  r;
     ngx_http_status_t   status;
-    ngx_int_t           content_length;
+    ngx_int_t           remains;
     ngx_flag_t          chunked;
     ngx_buf_t           body;
     ngx_pool_t         *pool;
@@ -173,15 +173,15 @@ recv_body:
 
             if (!chunked) {
 
-                if (content_length == 0)
+                if (remains == 0)
                     goto well_done;
 
-                if (content_length == -1)
-                    content_length = shared->buffer_size - 1;
+                if (remains == -1)
+                    remains = shared->buffer_size - 1;
             } else
-                content_length = 0;
+                remains = 0;
 
-            if (shared->buffer_size - 1 < (size_t) content_length) {
+            if (shared->buffer_size - 1 < (size_t) remains) {
                 ngx_log_error(NGX_LOG_WARN, c->log, 0,
                               "[%V] %V: %V addr=%V, fd=%d http "
                               "healthcheck_buffer_size too small for read body",
@@ -317,7 +317,7 @@ well_done:
         ngx_buf_t         *buf = state->buf;
         ssize_t            size;
 
-        if (content_length > buf->end - buf->last) {
+        if (remains > buf->end - buf->last) {
             ngx_log_error(NGX_LOG_WARN, c->log, 0,
                           "[%V] %V: %V addr=%V, fd=%d healthcheck_buffer_size "
                           "too small for read body",
@@ -326,10 +326,10 @@ well_done:
             return NGX_ERROR;
         }
 
-        if (content_length == 0)
+        if (remains <= 0)
             size = c->recv(c, buf->last, buf->end - buf->last);
         else
-            size = c->recv(c, buf->last, content_length);
+            size = c->recv(c, buf->last, remains);
 
         ngx_log_debug6(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "[%V] %V: %V addr=%V, "
@@ -397,7 +397,7 @@ well_done:
 
             if (rc == NGX_OK) {
                 if (ngx_strcmp(h.key.data, "content-length") == 0)
-                    content_length = ngx_atoi(h.value.data, h.value.len);
+                    remains = ngx_atoi(h.value.data, h.value.len);
 
                 if (ngx_strcmp(h.key.data, "transfer-encoding") == 0)
                     chunked = ngx_strcmp(h.value.data, "chunked") == 0;
@@ -440,13 +440,13 @@ well_done:
 
 again:
             
-            if (content_length != 0) {
-                size = ngx_min(buf->last - buf->pos, content_length);
+            if (remains != 0) {
+                size = ngx_min(buf->last - buf->pos, remains);
                 ngx_memcpy(body.last, buf->pos, size);
                 body.last += size;
                 buf->pos += size;
-                content_length -= size;
-                if (content_length > 0)
+                remains -= size;
+                if (remains > 0)
                     return NGX_AGAIN;
                 buf->pos += 2;  // CRLF
             }
@@ -460,8 +460,8 @@ again:
             if (sep == NULL)
                 return NGX_AGAIN;
 
-            content_length = ngx_hextoi(buf->pos, sep - buf->pos);
-            if (content_length < 0) {
+            remains = ngx_hextoi(buf->pos, sep - buf->pos);
+            if (remains < 0) {
                 ngx_log_error(NGX_LOG_WARN, c->log, 0,
                               "[%V] %V: %V addr=%V, fd=%d http "
                               "invalid chunk size",
@@ -470,7 +470,7 @@ again:
                 return NGX_ERROR;
             }
 
-            if (content_length == 0) {
+            if (remains == 0) {
                 *body.last = 0;
                 return NGX_OK;
             }
@@ -480,9 +480,9 @@ again:
                            " on_recv() body chunk, size=%d",
                            &this->module, &this->upstream,
                            &this->server, &this->name, c->fd,
-                           content_length);
+                           remains);
 
-            if (content_length > body.end - body.last - 1) {
+            if (remains > body.end - body.last - 1) {
                 ngx_log_error(NGX_LOG_WARN, c->log, 0,
                               "[%V] %V: %V addr=%V, fd=%d "
                               "healthcheck_buffer_size too small for read body",
@@ -496,7 +496,7 @@ again:
             goto again;
         }
 
-        if ((size_t) content_length > this->shared->buffer_size - 1) {
+        if ((size_t) remains > this->shared->buffer_size - 1) {
             ngx_log_error(NGX_LOG_WARN, c->log, 0,
                           "[%V] %V: %V addr=%V, fd=%d "
                           "healthcheck_buffer_size too small for read body",
@@ -507,10 +507,10 @@ again:
 
         ngx_memcpy(body.last, buf->pos, buf->last - buf->pos);
         body.last += buf->last - buf->pos;
-        content_length -= buf->last - buf->pos;
+        remains -= buf->last - buf->pos;
         buf->pos = buf->last = buf->start;
 
-        if (content_length == 0) {
+        if (remains == 0) {
             *body.last = 0;
             return NGX_OK;
         }
@@ -523,7 +523,7 @@ public:
     ngx_dynamic_healthcheck_http(PeerT *peer,
         ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
         : ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, s),
-          content_length(-1), chunked(0), pool(NULL)
+          remains(-1), chunked(0), pool(NULL)
     {
         ngx_memzero(&r, sizeof(ngx_http_request_t));
         ngx_memzero(&status, sizeof(ngx_http_status_t));
