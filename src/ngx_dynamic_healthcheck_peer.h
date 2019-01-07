@@ -60,7 +60,7 @@ private:
     handle_dummy(ngx_event_t *ev);
 
     ngx_int_t
-    post_checks(ngx_event_t *ev);
+    handle_io(ngx_event_t *ev);
 
     void
     abort();

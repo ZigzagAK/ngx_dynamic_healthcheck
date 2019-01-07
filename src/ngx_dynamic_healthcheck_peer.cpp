@@ -22,7 +22,7 @@ current_msec()
 
 
 static ngx_int_t
-ngx_dynamic_healthcheck_peer_test_connect(ngx_connection_t *c)
+test_connect(ngx_connection_t *c)
 {
     int        err;
     socklen_t  len;
@@ -63,30 +63,44 @@ ngx_dynamic_healthcheck_peer_test_connect(ngx_connection_t *c)
 }
 
 
-ngx_int_t
-ngx_dynamic_healthcheck_peer::post_checks(ngx_event_t *ev)
+static ngx_int_t
+handle_event(ngx_event_t *ev)
 {
     ngx_connection_t  *c = (ngx_connection_t *) ev->data;
-    ngx_dynamic_healthcheck_peer *peer =
-        (ngx_dynamic_healthcheck_peer *) c->data;
 
-    if (!ev->ready)
-        return NGX_OK;
+    if (ev->write) {
+        if (ngx_handle_write_event(c->write, 0) == NGX_OK)
+            return NGX_OK;
 
-    if (ev->write && ngx_handle_write_event(c->write, 0) != NGX_OK) {
-        ngx_dynamic_healthcheck_peer_test_connect(c);
-        ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
-            "[%V] %V: %V addr=%V, fd=%d post checks (ngx_handle_write_event)",
-            &peer->module, &peer->upstream, &peer->server, &peer->name, c->fd);
-
+        test_connect(c);
         return NGX_ERROR;
     }
 
-    if (!ev->write && ngx_handle_read_event(c->read, 0) != NGX_OK) {
-        ngx_dynamic_healthcheck_peer_test_connect(c);
+    if (ngx_handle_read_event(c->read, 0) == NGX_OK)
+        return NGX_OK;
+
+    test_connect(c);
+    return NGX_ERROR;
+}
+
+
+ngx_int_t
+ngx_dynamic_healthcheck_peer::handle_io(ngx_event_t *ev)
+{
+    ngx_connection_t              *c;
+    ngx_dynamic_healthcheck_peer  *peer;
+
+    if (ev->ready) {
+        if (handle_event(ev) == NGX_OK)
+            return NGX_OK;
+
+        c = (ngx_connection_t *) ev->data;
+        peer = (ngx_dynamic_healthcheck_peer *) c->data;
+
         ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
-            "[%V] %V: %V addr=%V, fd=%d post checks (ngx_handle_read_event)",
-            &peer->module, &peer->upstream, &peer->server, &peer->name, c->fd);
+                      "[%V] %V: %V addr=%V, fd=%d handle io",
+                      &peer->module, &peer->upstream,
+                      &peer->server, &peer->name, c->fd);
 
         return NGX_ERROR;
     }
@@ -143,42 +157,33 @@ void
 ngx_dynamic_healthcheck_peer::handle_idle(ngx_event_t *ev)
 {
     ngx_connection_t             *c = (ngx_connection_t *) ev->data;
-    ngx_dynamic_hc_local_node_t  *state;
-    ngx_socket_t                  fd = c->fd;
+    ngx_dynamic_hc_local_node_t  *state =
+        (ngx_dynamic_hc_local_node_t *) c->data;
 
-    state = (ngx_dynamic_hc_local_node_t *) c->data;
+    c->log->action = (char *) "idle";
 
-    if (fd != -1) {
-        if (ngx_stopping() || state->expired <= current_msec())
-            ngx_close_connection(c);
-        if (ev->ready)
-            if ((ev->write && ngx_handle_write_event(c->write, 0) != NGX_OK)
-                || (!ev->write && ngx_handle_read_event(c->read, 0) != NGX_OK))
-                ngx_close_connection(c);
-    }
+    ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                   "[%V] %V: %V addr=%V, fd=%d handle_idle()",
+                   &state->module, &state->upstream,
+                   &state->server, &state->name, c->fd);
 
-    if (ngx_stopping()) {
-        if (fd != -1) {
-            ngx_log_debug1(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                           "worker stopping, close fd=%d", fd);
-        }
-        return;
-    }
+    if (handle_event(ev) == NGX_ERROR)
+        goto close;
 
-    if (c->fd == -1 && fd != -1) {
-        ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: %V addr=%V, fd=%d idle close",
-                       &state->module, &state->upstream,
-                       &state->server, &state->name, c->fd);
-    }
+    if (state->expired <= current_msec())
+        goto close;
 
-    if (c->fd == -1)
-        state->pc.connection = NULL;
+    if (ngx_stopping())
+        goto close;
 
-    if (state->expired > current_msec()) {
-        if (!c->write->timer_set)
-            ngx_add_timer(c->write, 1000);
-    }
+    ngx_add_timer(c->write, 1000);
+
+    return;
+
+close:
+
+    ngx_close_connection(c);
+    state->pc.connection = NULL;
 }
 
 
@@ -190,14 +195,9 @@ ngx_dynamic_healthcheck_peer::handle_connect(ngx_event_t *ev)
         (ngx_dynamic_healthcheck_peer *) c->data;
 
     c->log->action = (char *) "connecting";
-    
-    if (ngx_stopping()) {
-        ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                       "[%V] %V: %V addr=%V, fd=%d worker stopping, close",
-                       &peer->module, &peer->upstream,
-                       &peer->server, &peer->name, c->fd);
+
+    if (ngx_stopping())
         return peer->abort();
-    }
 
     if (ev->timedout) {
         ngx_log_error(NGX_LOG_ERR, c->log, NGX_ETIMEDOUT,
@@ -208,23 +208,12 @@ ngx_dynamic_healthcheck_peer::handle_connect(ngx_event_t *ev)
         return peer->fail();
     }
 
-    ngx_del_timer(c->write);
-
-    ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, ngx_socket_errno,
+    ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "[%V] %V: %V addr=%V, fd=%d handle_connect()",
                    &peer->module, &peer->upstream,
                    &peer->server, &peer->name, c->fd);
 
-    if (ngx_dynamic_healthcheck_peer_test_connect(c) != NGX_OK) {
-        ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
-                      "[%V] %V: %V addr=%V, fd=%d connect failed",
-                      &peer->module, &peer->upstream,
-                      &peer->server, &peer->name, c->fd);
-
-        return peer->fail();
-    }
-
-    if (peer->post_checks(ev) == NGX_ERROR)
+    if (peer->handle_io(ev) == NGX_ERROR)
         return peer->fail();
 
     peer->check_state = st_connected;
@@ -264,15 +253,11 @@ ngx_dynamic_healthcheck_peer::handle_write(ngx_event_t *ev)
         return peer->fail();
     }
 
-    if (peer->check_state != st_connected
-        && peer->check_state != st_sending) {
-
-        ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
+    if (peer->check_state != st_connected && peer->check_state != st_sending) {
+        ngx_log_error(NGX_LOG_ERR, c->log, 0,
                       "[%V] %V: %V addr=%V, fd=%d invalid state",
                       &peer->module, &peer->upstream,
                       &peer->server, &peer->name, c->fd);
-
-        ngx_del_timer(c->write);
         return peer->fail();
     }
 
@@ -289,10 +274,8 @@ ngx_dynamic_healthcheck_peer::handle_write(ngx_event_t *ev)
                    &peer->module, &peer->upstream,
                    &peer->server, &peer->name, c->fd, rc);
 
-    if (peer->post_checks(ev) == NGX_ERROR) {
-        ngx_del_timer(c->write);
+    if (peer->handle_io(ev) == NGX_ERROR)
         return peer->fail();
-    }
 
     switch(rc) {
         case NGX_DECLINED:
@@ -309,7 +292,6 @@ ngx_dynamic_healthcheck_peer::handle_write(ngx_event_t *ev)
 
         case NGX_ERROR:
         default:
-            ngx_del_timer(c->write);
             return peer->fail();
     }
 
@@ -351,19 +333,15 @@ ngx_dynamic_healthcheck_peer::handle_read(ngx_event_t *ev)
                       "[%V] %V: %V addr=%V, fd=%d read response timed out",
                       &peer->module, &peer->upstream,
                       &peer->server, &peer->name, c->fd);
-
         return peer->fail();
     }
 
-    if (peer->check_state != st_sent
-        && peer->check_state != st_receiving) {
-
-        ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
+    if (peer->check_state != st_sent && peer->check_state != st_receiving) {
+        ngx_log_error(NGX_LOG_ERR, c->log, 0,
                       "[%V] %V: %V addr=%V, fd=%d invalid state",
                       &peer->module, &peer->upstream,
                       &peer->server, &peer->name, c->fd);
 
-        ngx_del_timer(c->read);
         return peer->fail();
     }
 
@@ -380,10 +358,8 @@ ngx_dynamic_healthcheck_peer::handle_read(ngx_event_t *ev)
                    &peer->module, &peer->upstream,
                    &peer->server, &peer->name, c->fd, rc);
 
-    if (peer->post_checks(ev) == NGX_ERROR) {
-        ngx_del_timer(c->read);
+    if (peer->handle_io(ev) == NGX_ERROR)
         return peer->fail();
-    }
 
     switch(rc) {
         case NGX_DECLINED:
@@ -400,7 +376,6 @@ ngx_dynamic_healthcheck_peer::handle_read(ngx_event_t *ev)
 
         case NGX_ERROR:
         default:
-            ngx_del_timer(c->read);
             return peer->fail();
     }
 
@@ -417,7 +392,7 @@ ngx_dynamic_healthcheck_peer::handle_dummy(ngx_event_t *ev)
     ngx_dynamic_healthcheck_peer *peer =
         (ngx_dynamic_healthcheck_peer *) c->data;
 
-    ngx_dynamic_healthcheck_peer_test_connect(c);
+    test_connect(c);
 
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, ngx_socket_errno,
                    "[%V] %V: %V addr=%V, fd=%d handle_dummy()",
@@ -427,10 +402,8 @@ ngx_dynamic_healthcheck_peer::handle_dummy(ngx_event_t *ev)
     if (!ev->ready)
         return;
 
-    if (peer->post_checks(ev) == NGX_ERROR) {
-        ngx_del_timer(c->write);
+    if (peer->handle_io(ev) == NGX_ERROR)
         return peer->fail();
-    }
 }
 
 
