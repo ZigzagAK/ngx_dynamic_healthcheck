@@ -91,6 +91,7 @@ ngx_dynamic_healthcheck_peer::handle_io(ngx_event_t *ev)
     ngx_dynamic_healthcheck_peer  *peer;
 
     if (ev->ready) {
+
         if (handle_event(ev) == NGX_OK)
             return NGX_OK;
 
@@ -201,7 +202,16 @@ ngx_dynamic_healthcheck_peer::handle_connect(ngx_event_t *ev)
 
     if (ev->timedout) {
         ngx_log_error(NGX_LOG_ERR, c->log, NGX_ETIMEDOUT,
-                      "[%V] %V: %V addr=%V, fd=%d timed out",
+                      "[%V] %V: %V addr=%V, fd=%d connect timed out",
+                      &peer->module, &peer->upstream,
+                      &peer->server, &peer->name, c->fd);
+
+        return peer->fail();
+    }
+
+    if (test_connect(c) == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
+                      "[%V] %V: %V addr=%V, fd=%d connect error",
                       &peer->module, &peer->upstream,
                       &peer->server, &peer->name, c->fd);
 
