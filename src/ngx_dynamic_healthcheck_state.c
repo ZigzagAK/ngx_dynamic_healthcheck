@@ -176,7 +176,7 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
     n.local->state = &state->local;
 
     // insert nodes
-    
+
     node = (ngx_rbtree_node_t *) n.shared;
     node->key = hash;
 
