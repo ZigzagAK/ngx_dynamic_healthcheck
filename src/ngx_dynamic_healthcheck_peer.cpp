@@ -166,7 +166,7 @@ ngx_dynamic_healthcheck_peer::handle_idle(ngx_event_t *ev)
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "[%V] %V: %V addr=%V, fd=%d handle_idle()",
                    &state->module, &state->upstream,
-                   &state->server, &state->name, c->fd);
+                   &state->server, &state->name.str, c->fd);
 
     if (handle_event(ev) == NGX_ERROR)
         goto close;

@@ -11,7 +11,7 @@ build_deps=0
 
 DIR="$(pwd)"
 
-VERSION="1.13.12"
+VERSION="1.15.6"
 PCRE_VERSION="8.39"
 LUAJIT_VERSION="2.1.0-beta2"
 ZLIB_VERSION="1.2.11"
@@ -258,11 +258,11 @@ function build() {
 
   build_cJSON
 
-  make clean > /dev/null 2>&1
-  build_debug
+#  make clean > /dev/null 2>&1
+#  build_debug
 
- # make clean > /dev/null 2>&1
- # build_release
+  make clean > /dev/null 2>&1
+  build_release
 
   install_file  "$JIT_PREFIX/usr/local/lib"           .
   install_file  lua-cjson/cjson.so                    lib/lua/5.1
