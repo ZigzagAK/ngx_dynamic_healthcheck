@@ -6,13 +6,6 @@
 #include "ngx_dynamic_healthcheck_peer.h"
 
 
-ngx_inline ngx_flag_t
-ngx_stopping()
-{
-    return ngx_exiting || ngx_terminate || ngx_quit;
-}
-
-
 static ngx_inline ngx_msec_t
 current_msec()
 {
@@ -184,7 +177,7 @@ ngx_dynamic_healthcheck_peer::handle_idle(ngx_event_t *ev)
 close:
 
     ngx_close_connection(c);
-    state->pc.connection = NULL;
+    ngx_memzero(&state->pc, sizeof(ngx_peer_connection_t));
 }
 
 
@@ -402,6 +395,9 @@ ngx_dynamic_healthcheck_peer::handle_dummy(ngx_event_t *ev)
     ngx_dynamic_healthcheck_peer *peer =
         (ngx_dynamic_healthcheck_peer *) c->data;
 
+    if (ngx_stopping())
+        return peer->abort();
+
     test_connect(c);
 
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, ngx_socket_errno,
@@ -447,10 +443,8 @@ ngx_dynamic_healthcheck_peer::close()
     if (c != NULL) {
         ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
                        "[%V] %V: %V addr=%V, fd=%d close()",
-                       &module, &upstream, &server, &name,
-                       state.local->pc.connection->fd);
-        ngx_close_connection(state.local->pc.connection);
-        state.local->pc.connection = NULL;
+                       &module, &upstream, &server, &name, c->fd);
+        ngx_close_connection(c);
     }
 
     ngx_memzero(&state.local->pc, sizeof(ngx_peer_connection_t));
@@ -466,6 +460,9 @@ ngx_dynamic_healthcheck_peer::set_keepalive()
         return;
 
     if (c->read->pending_eof)
+        goto close;
+
+    if (ngx_stopping())
         goto close;
 
     ngx_log_debug7(NGX_LOG_DEBUG_HTTP, c->log, 0,
@@ -647,6 +644,12 @@ ngx_dynamic_healthcheck_peer::check()
                            hosts[j].data[i].len) == 0)
                 goto disabled;
         }
+    }
+
+    if (ngx_stopping()) {
+
+        close();
+        goto end;
     }
 
     return connect();

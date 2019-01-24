@@ -119,6 +119,13 @@ typedef struct ngx_dynamic_healthcheck_event_s ngx_dynamic_healthcheck_event_t;
 
 
 ngx_inline ngx_flag_t
+ngx_stopping()
+{
+    return ngx_exiting || ngx_terminate || ngx_quit;
+}
+
+
+ngx_inline ngx_flag_t
 ngx_peer_excluded(ngx_str_t *name,
     ngx_dynamic_healthcheck_conf_t *conf)
 {

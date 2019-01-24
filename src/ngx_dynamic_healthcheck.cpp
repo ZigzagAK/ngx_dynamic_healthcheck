@@ -18,13 +18,13 @@ extern "C" {
 static void
 ngx_dynamic_healthcheck_refresh_timers(ngx_event_t *ev)
 {
-    if (ngx_exiting || ngx_terminate || ngx_quit)
-        return;
-
     ngx_dynamic_healthcheck_api<ngx_http_upstream_main_conf_t,
         ngx_http_upstream_srv_conf_t>::refresh_timers(ev->log);
     ngx_dynamic_healthcheck_api<ngx_stream_upstream_main_conf_t,
         ngx_stream_upstream_srv_conf_t>::refresh_timers(ev->log);
+
+    if (ngx_stopping())
+        return;
 
     ngx_add_timer(ev, 1000);
 }
