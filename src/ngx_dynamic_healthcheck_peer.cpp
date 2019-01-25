@@ -610,6 +610,12 @@ ngx_dynamic_healthcheck_peer::check()
     };
     ngx_uint_t i, j;
 
+    if (ngx_stopping()) {
+
+        close();
+        goto end;
+    }
+
     if (opts->disabled)
         goto disabled;
 
@@ -644,12 +650,6 @@ ngx_dynamic_healthcheck_peer::check()
                            hosts[j].data[i].len) == 0)
                 goto disabled;
         }
-    }
-
-    if (ngx_stopping()) {
-
-        close();
-        goto end;
     }
 
     return connect();
