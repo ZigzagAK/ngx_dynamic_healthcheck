@@ -37,7 +37,7 @@ typedef struct {
 
 
 typedef struct {
-    ngx_str_node_t                 name;
+    ngx_str_node_t                 key;
 
     ngx_int_t                      fall;
     ngx_int_t                      rise;
@@ -52,12 +52,13 @@ typedef struct {
 
 
 typedef struct {
-    ngx_str_node_t                 name;
+    ngx_str_node_t                 key;
 
     ngx_str_t                      module;
     ngx_str_t                      upstream;
 
     ngx_str_t                      server;
+    ngx_str_t                      name;
     struct sockaddr               *sockaddr;
     socklen_t                      socklen;
 
@@ -93,7 +94,7 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
 
 ngx_int_t
 ngx_dynamic_healthcheck_state_stat(ngx_dynamic_hc_state_t *state,
-    ngx_str_t *name, ngx_dynamic_hc_stat_t *stat);
+    ngx_str_t *server, ngx_str_t *name, ngx_dynamic_hc_stat_t *stat);
 
 void
 ngx_dynamic_healthcheck_state_delete(ngx_dynamic_hc_state_node_t state);

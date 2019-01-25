@@ -449,3 +449,198 @@ u2 127.0.0.6:6006 1 0
 --- response_body_like
 u1 127.0.0.1:6000 0
 
+
+=== TEST 6: check http close socket
+--- stream_config
+    server {
+      listen 6001;
+      content_by_lua_block {
+        ngx.sleep(1)
+      }
+    }
+--- stream_server_config
+    content_by_lua_block {
+      ngx.say("hello")
+    }
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001 down;
+        server 127.0.0.2:6001 down backup;
+        check type=http fall=2 rise=1 timeout=1500 interval=1;
+        check_request_uri GET /heartbeat;
+        check_response_body pong;
+        check_response_codes 200 201 204;
+    }
+--- config
+    location /status {
+      healthcheck_status;
+    }
+    location /test {
+        content_by_lua_block {
+            ngx.sleep(1)
+            local resp = assert(ngx.location.capture("/status"))
+            if resp.status ~= ngx.HTTP_OK then
+              ngx.say(resp.status)
+            end
+            local cjson = require "cjson"
+            local data = cjson.decode(resp.body)
+            local t = {}
+            for u, h in pairs(data)
+            do
+              for p, s in pairs(h.primary)
+              do
+                table.insert(t, string.format("%s %s %d 1 %d %d", u, p, s.down, s.fall, s.rise))
+              end
+              for p, s in pairs(h.backup or {})
+              do
+                table.insert(t, string.format("%s %s %d 0 %d %d", u, p, s.down, s.fall, s.rise))
+              end
+            end
+            table.sort(t)
+            for i,l in ipairs(t)
+            do
+              ngx.say(l)
+              ngx.log(ngx.INFO, l)
+            end
+        }
+    }
+--- request
+    GET /test
+--- response_body
+u1 127.0.0.1:6001 1 1 1 0
+u1 127.0.0.2:6001 1 0 1 0
+
+
+=== TEST 7: check http close socket on body
+--- stream_config
+    server {
+      listen 6001;
+      content_by_lua_block {
+        ngx.print("HTTP/1.0 200 OK\r\n")
+        ngx.print("Server: nginx/1.13.12\r\n")
+        ngx.print("Content-Type: text/plain\r\n")
+        ngx.print("Content-Length: 10\r\n")
+        ngx.print("Connection: close\r\n\r\n")
+      }
+    }
+--- stream_server_config
+    content_by_lua_block {
+      ngx.say("hello")
+    }
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001 down;
+        server 127.0.0.2:6001 down backup;
+        check type=http fall=2 rise=1 timeout=1500 interval=1;
+        check_request_uri GET /heartbeat;
+        check_response_body pong;
+        check_response_codes 200 201 204;
+    }
+--- config
+    location /status {
+      healthcheck_status;
+    }
+    location /test {
+        content_by_lua_block {
+            ngx.sleep(1)
+            local resp = assert(ngx.location.capture("/status"))
+            if resp.status ~= ngx.HTTP_OK then
+              ngx.say(resp.status)
+            end
+            local cjson = require "cjson"
+            local data = cjson.decode(resp.body)
+            local t = {}
+            for u, h in pairs(data)
+            do
+              for p, s in pairs(h.primary)
+              do
+                table.insert(t, string.format("%s %s %d 1 %d %d", u, p, s.down, s.fall, s.rise))
+              end
+              for p, s in pairs(h.backup or {})
+              do
+                table.insert(t, string.format("%s %s %d 0 %d %d", u, p, s.down, s.fall, s.rise))
+              end
+            end
+            table.sort(t)
+            for i,l in ipairs(t)
+            do
+              ngx.say(l)
+              ngx.log(ngx.INFO, l)
+            end
+        }
+    }
+--- request
+    GET /test
+--- response_body_like
+u1 127.0.0.1:6001 1 1 1 0
+u1 127.0.0.2:6001 1 0 1 0
+
+
+=== TEST 8: check http body < content-length
+--- stream_config
+    server {
+      listen 6001;
+      content_by_lua_block {
+        ngx.print("HTTP/1.0 200 OK\r\n")
+        ngx.print("Server: nginx/1.13.12\r\n")
+        ngx.print("Content-Type: text/plain\r\n")
+        ngx.print("Content-Length: 100\r\n")
+        ngx.print("Connection: close\r\n\r\n")
+        ngx.print("pong\r\n")
+      }
+    }
+--- stream_server_config
+    content_by_lua_block {
+      ngx.say("hello")
+    }
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001 down;
+        server 127.0.0.2:6001 down backup;
+        check type=http fall=2 rise=1 timeout=1500 interval=1;
+        check_request_uri GET /heartbeat;
+        check_response_body pong;
+        check_response_codes 200 201 204;
+    }
+--- config
+    location /status {
+      healthcheck_status;
+    }
+    location /test {
+        content_by_lua_block {
+            ngx.sleep(1)
+            local resp = assert(ngx.location.capture("/status"))
+            if resp.status ~= ngx.HTTP_OK then
+              ngx.say(resp.status)
+            end
+            local cjson = require "cjson"
+            local data = cjson.decode(resp.body)
+            local t = {}
+            for u, h in pairs(data)
+            do
+              for p, s in pairs(h.primary)
+              do
+                table.insert(t, string.format("%s %s %d 1 %d %d", u, p, s.down, s.fall, s.rise))
+              end
+              for p, s in pairs(h.backup or {})
+              do
+                table.insert(t, string.format("%s %s %d 0 %d %d", u, p, s.down, s.fall, s.rise))
+              end
+            end
+            table.sort(t)
+            for i,l in ipairs(t)
+            do
+              ngx.say(l)
+              ngx.log(ngx.INFO, l)
+            end
+        }
+    }
+--- request
+    GET /test
+--- response_body_like
+u1 127.0.0.1:6001 1 1 1 0
+u1 127.0.0.2:6001 1 0 1 0
+

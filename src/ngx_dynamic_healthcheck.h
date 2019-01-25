@@ -188,11 +188,17 @@ public:
             goto end;
 
 timer:
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, event->log, 0,
+                       "[%V] remains=%d", &uscf->host, event->remains);
+
         ngx_add_timer(ev, 1000);
 
         return;
 
 end:
+
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, event->log, 0,
+                       "[%V] remains=%d", &uscf->host, event->remains);
 
         event->completed(event);
 

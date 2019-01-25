@@ -281,7 +281,9 @@ ngx_http_dynamic_healthcheck_touch(ngx_http_request_t *r)
     ngx_dynamic_healthcheck_conf_t  *uscf;
     ngx_http_upstream_state_t       *state;
 
-    if (r->upstream == NULL || r->upstream->upstream == NULL)
+    if (r->upstream == NULL
+        || r->upstream->upstream == NULL
+        || r->upstream->upstream->srv_conf == NULL)
         return NGX_OK;
 
     uscf = (ngx_dynamic_healthcheck_conf_t *)
@@ -383,7 +385,7 @@ ngx_http_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
                 || ngx_peer_excluded(&peer->server, conf))
                 continue;
             if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
-                    &peer->name, &stat) == NGX_OK) {
+                    &peer->server, &peer->name, &stat) == NGX_OK) {
                 peer->down = stat.rise < conf->shared->rise;
             }
         }
@@ -1173,7 +1175,7 @@ ngx_http_dynamic_healthcheck_status_hc(ngx_http_request_t *r,
 
             for (peer = peers->peer; peer; peer = peer->next) {
                 if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
-                        &peer->name, &stat) != NGX_OK)
+                        &peer->server, &peer->name, &stat) != NGX_OK)
                     ngx_memzero(&stat, sizeof(ngx_dynamic_hc_stat_t));
 
                 out->buf->last = ngx_snprintf(out->buf->last,

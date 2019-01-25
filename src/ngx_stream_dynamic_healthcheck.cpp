@@ -277,7 +277,7 @@ ngx_stream_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
                 || ngx_peer_excluded(&peer->server, conf))
                 continue;
             if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
-                    &peer->name, &stat) == NGX_OK) {
+                    &peer->server, &peer->name, &stat) == NGX_OK) {
                 peer->down = stat.rise < conf->shared->rise;
             }
         }

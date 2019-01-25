@@ -157,7 +157,7 @@ public:
 
         peer->conns++;
 
-        name     = s.local->name.str;
+        name     = s.local->name;
         server   = s.local->server;
         upstream = s.local->upstream;
         module   = s.local->module;

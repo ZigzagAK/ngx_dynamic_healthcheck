@@ -700,7 +700,7 @@ get_status(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf)
 
         for (peer = peers->peer; peer; peer = peer->next) {
             if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
-                    &peer->name, &stat) == NGX_OK) {
+                    &peer->server, &peer->name, &stat) == NGX_OK) {
                 lua_pushlstring(L, (const char *) peer->name.data,
                                 peer->name.len);
 

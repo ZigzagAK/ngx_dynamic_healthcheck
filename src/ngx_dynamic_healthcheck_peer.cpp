@@ -159,7 +159,7 @@ ngx_dynamic_healthcheck_peer::handle_idle(ngx_event_t *ev)
     ngx_log_debug5(NGX_LOG_DEBUG_HTTP, c->log, 0,
                    "[%V] %V: %V addr=%V, fd=%d handle_idle()",
                    &state->module, &state->upstream,
-                   &state->server, &state->name.str, c->fd);
+                   &state->server, &state->name, c->fd);
 
     if (handle_event(ev) == NGX_ERROR)
         goto close;
@@ -513,7 +513,7 @@ ngx_dynamic_healthcheck_peer::connect()
 
     state.local->pc.sockaddr = state.local->sockaddr;
     state.local->pc.socklen = state.local->socklen;
-    state.local->pc.name = &state.local->name.str;
+    state.local->pc.name = &state.local->name;
     state.local->pc.get = ngx_event_get_peer;
     state.local->pc.log = ngx_cycle->log;
     state.local->pc.log_error = NGX_ERROR_ERR;

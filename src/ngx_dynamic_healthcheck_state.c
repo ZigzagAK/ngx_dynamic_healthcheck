@@ -5,21 +5,26 @@
 #include "ngx_dynamic_healthcheck_state.h"
 
 
+#define ngx_stack_alloc(n) alloca(n)
+
+
 ngx_int_t
 ngx_dynamic_healthcheck_state_stat(ngx_dynamic_hc_state_t *state,
-    ngx_str_t *name, ngx_dynamic_hc_stat_t *stat)
+    ngx_str_t *server, ngx_str_t *name, ngx_dynamic_hc_stat_t *stat)
 {
     ngx_dynamic_hc_shared_node_t  *shared;
-    uint32_t                       hash;
     ngx_rbtree_t                  *rbtree = &state->shared->rbtree;
     ngx_slab_pool_t               *slab = state->shared->slab;
+    ngx_str_t                      key;
 
-    hash = ngx_crc32_short(name->data, name->len);
+    key.len = server->len + name->len + 1;
+    key.data = ngx_stack_alloc(key.len);
+    ngx_snprintf(key.data, key.len, "%V/%V", name, server);
 
     ngx_shmtx_lock(&slab->mutex);
 
     shared = (ngx_dynamic_hc_shared_node_t *)
-        ngx_str_rbtree_lookup(rbtree, name, hash);
+        ngx_str_rbtree_lookup(rbtree, &key, 0);
 
     if (shared == NULL) {
 
@@ -63,12 +68,19 @@ ngx_dynamic_healthcheck_create_local(ngx_str_t *server, ngx_str_t *name,
     ngx_memcpy(n->server.data, server->data, server->len);
     n->server.len = server->len;
 
-    n->name.str.data = ngx_pcalloc(pool, name->len);
-    if (n->name.str.data == NULL)
+    n->name.data = ngx_pcalloc(pool, name->len);
+    if (n->name.data == NULL)
         goto nomem;
 
-    ngx_memcpy(n->name.str.data, name->data, name->len);
-    n->name.str.len = name->len;
+    ngx_memcpy(n->name.data, name->data, name->len);
+    n->name.len = name->len;
+
+    n->key.str.len = server->len + 1 + name->len;
+    n->key.str.data = ngx_pcalloc(pool, n->key.str.len);
+    if (n->key.str.data == NULL)
+        goto nomem;
+
+    ngx_snprintf(n->key.str.data, n->key.str.len, "%V/%V", name, server);
 
     n->buf = ngx_create_temp_buf(pool, buffer_size);
     if (n->buf == NULL)
@@ -97,25 +109,27 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
 {
     ngx_dynamic_hc_state_node_t   n;
     ngx_rbtree_node_t            *node;
-    uint32_t                      hash;
     ngx_rbtree_t                 *local = &state->local.rbtree;
     ngx_rbtree_t                 *shared = &state->shared->rbtree;
     ngx_slab_pool_t              *slab = state->shared->slab;
     ngx_flag_t                    nomem = 0;
+    ngx_str_t                     key;
 
-    hash = ngx_crc32_short(name->data, name->len);
+    key.len = server->len + name->len + 1;
+    key.data = ngx_stack_alloc(key.len);
+    ngx_snprintf(key.data, key.len, "%V/%V", name, server);
 
     ngx_memzero(&n, sizeof(ngx_dynamic_hc_state_node_t));
 
     ngx_shmtx_lock(&slab->mutex);
 
     n.shared = (ngx_dynamic_hc_shared_node_t *)
-        ngx_str_rbtree_lookup(shared, name, hash);
+        ngx_str_rbtree_lookup(shared, &key, 0);
 
     if (n.shared != NULL) {
 
         n.local = (ngx_dynamic_hc_local_node_t *)
-            ngx_str_rbtree_lookup(local, name, hash);
+            ngx_str_rbtree_lookup(local, &key, 0);
 
         if (n.local != NULL) {
 
@@ -139,7 +153,7 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
         n.local->state = &state->local;
 
         node = (ngx_rbtree_node_t *) n.local;
-        node->key = hash;
+        node->key = 0;
 
         ngx_rbtree_insert(local, node);
 
@@ -153,13 +167,13 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
     if (n.shared == NULL)
         goto done;
 
-    n.shared->name.str.data = ngx_slab_calloc_locked(slab, name->len);
-    if (n.shared->name.str.data == NULL) {
+    n.shared->key.str.data = ngx_slab_calloc_locked(slab, key.len);
+    if (n.shared->key.str.data == NULL) {
         nomem = 1;
         goto done;
     }
-    ngx_memcpy(n.shared->name.str.data, name->data, name->len);
-    n.shared->name.str.len = name->len;
+    ngx_memcpy(n.shared->key.str.data, key.data, key.len);
+    n.shared->key.str.len = key.len;
 
     n.shared->state = state->shared;
 
@@ -178,12 +192,12 @@ ngx_dynamic_healthcheck_state_get(ngx_dynamic_hc_state_t *state,
     // insert nodes
 
     node = (ngx_rbtree_node_t *) n.shared;
-    node->key = hash;
+    node->key = 0;
 
     ngx_rbtree_insert(shared, node);
 
     node = (ngx_rbtree_node_t *) n.local;
-    node->key = hash;
+    node->key = 0;
 
     ngx_rbtree_insert(local, node);
 
@@ -191,8 +205,8 @@ done:
 
     if (nomem) {
 
-        if (n.shared->name.str.data != NULL)
-            ngx_slab_free_locked(slab, n.shared->name.str.data);
+        if (n.shared->key.str.data != NULL)
+            ngx_slab_free_locked(slab, n.shared->key.str.data);
 
         ngx_slab_free_locked(slab, n.shared);
 
@@ -229,7 +243,7 @@ ngx_dynamic_healthcheck_state_delete(ngx_dynamic_hc_state_node_t state)
     ngx_rbtree_delete(&state.shared->state->rbtree,
         (ngx_rbtree_node_t *) state.shared);
 
-    ngx_slab_free_locked(slab, state.shared->name.str.data);
+    ngx_slab_free_locked(slab, state.shared->key.str.data);
 
     ngx_shmtx_unlock(&slab->mutex);
 
@@ -278,25 +292,45 @@ again:
 }
 
 
+static void
+traverse_tree(ngx_rbtree_node_t *node,
+    ngx_rbtree_node_t *sentinel, ngx_str_t *name)
+{
+    ngx_time_t                    *tp = ngx_timeofday();
+    ngx_int_t                      rc;
+    ngx_dynamic_hc_shared_node_t  *n;
+
+    if (node == sentinel)
+        return;
+
+    n = (ngx_dynamic_hc_shared_node_t *) node;
+
+    if (name->len > n->key.str.len)
+        return traverse_tree(node->right, sentinel, name);
+
+    rc = ngx_memcmp(name->data, n->key.str.data, name->len);
+
+    if (rc == 0)
+        n->checked = tp->sec;
+
+    if (rc <= 0)
+        traverse_tree(node->left, sentinel, name);
+
+    if (rc >= 0)
+        traverse_tree(node->right, sentinel, name);
+}
+
+
 void
 ngx_dynamic_healthcheck_state_checked(ngx_dynamic_hc_state_t *state,
     ngx_str_t *name)
 {
-    ngx_dynamic_hc_shared_node_t  *shared;
-    uint32_t                       hash;
-    ngx_rbtree_t                  *rbtree = &state->shared->rbtree;
-    ngx_slab_pool_t               *slab = state->shared->slab;
-    ngx_time_t                    *tp = ngx_timeofday();
-
-    hash = ngx_crc32_short(name->data, name->len);
+    ngx_rbtree_t     *rbtree = &state->shared->rbtree;
+    ngx_slab_pool_t  *slab = state->shared->slab;
 
     ngx_shmtx_lock(&slab->mutex);
 
-    shared = (ngx_dynamic_hc_shared_node_t *)
-        ngx_str_rbtree_lookup(rbtree, name, hash);
-
-    if (shared != NULL)
-        shared->checked = tp->sec;
+    traverse_tree(rbtree->root, rbtree->sentinel, name);
 
     ngx_shmtx_unlock(&slab->mutex);
 }
