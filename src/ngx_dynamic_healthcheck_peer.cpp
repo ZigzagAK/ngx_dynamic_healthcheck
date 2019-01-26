@@ -697,7 +697,7 @@ ngx_dynamic_healthcheck_match_buffer(ngx_str_t *pattern, ngx_str_t *s)
 
     if (s->data == NULL)
         s->data = (u_char *) "";
-    
+
     rc.pattern = *pattern;
     rc.err.len = NGX_MAX_CONF_ERRSTR;
     rc.err.data = errstr;
