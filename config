@@ -7,7 +7,7 @@ HTTP_DYNAMIC_HC_SRCS="                                    \
     $ngx_addon_dir/src/ngx_dynamic_healthcheck.cpp        \
     $ngx_addon_dir/src/ngx_dynamic_healthcheck_state.c    \
     $ngx_addon_dir/src/ngx_dynamic_healthcheck_peer.cpp   \
-    $ngx_addon_dir/src/ngx_dynamic_healthcheck_http.c     \
+    $ngx_addon_dir/src/ngx_dynamic_healthcheck_http.cpp   \
     $ngx_addon_dir/src/ngx_dynamic_healthcheck_api.cpp    \
     $ngx_addon_dir/src/ngx_dynamic_healthcheck_config.cpp \
     $ngx_addon_dir/src/ngx_http_dynamic_healthcheck.cpp   \

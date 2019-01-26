@@ -1,5 +1,7 @@
 #!/bin/bash
 
+ulimit -c unlimited
+
 DIR=$(pwd)
 nginx_fname=$(ls -1 $DIR/install/*.tar.gz)
 
