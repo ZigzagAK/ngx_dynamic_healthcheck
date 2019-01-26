@@ -186,12 +186,9 @@ static ngx_command_t ngx_http_dynamic_healthcheck_commands[] = {
 
 };
 
-#ifdef _WITH_LUA_API
+
 static ngx_int_t
 ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf);
-#else
-#define ngx_http_dynamic_healthcheck_post_conf NULL
-#endif
 
 
 static char *
@@ -274,6 +271,8 @@ ngx_http_dynamic_healthcheck_create_module(lua_State *L)
 extern int
 ngx_stream_dynamic_healthcheck_create_module(lua_State *L);
 
+#endif
+
 
 static ngx_int_t
 ngx_http_dynamic_healthcheck_touch(ngx_http_request_t *r)
@@ -314,6 +313,8 @@ ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf)
     ngx_http_core_main_conf_t   *mcf;
     ngx_http_handler_pt         *handler;
 
+#ifdef _WITH_LUA_API
+
     if (ngx_http_lua_add_package_preload(cf, "ngx.healthcheck",
         ngx_http_dynamic_healthcheck_create_module) != NGX_OK)
         return NGX_ERROR;
@@ -321,6 +322,8 @@ ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf)
     if (ngx_http_lua_add_package_preload(cf, "ngx.healthcheck.stream",
         ngx_stream_dynamic_healthcheck_create_module) != NGX_OK)
         return NGX_ERROR;
+
+#endif
 
     mcf = (ngx_http_core_main_conf_t *)
         ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
@@ -331,11 +334,10 @@ ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf)
         return NGX_ERROR;
 
     *handler = ngx_http_dynamic_healthcheck_touch;
-    
+
     return NGX_OK;
 }
 
-#endif
 
 static void *
 ngx_http_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
