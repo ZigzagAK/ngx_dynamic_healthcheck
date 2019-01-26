@@ -138,7 +138,7 @@ ngx_dynamic_healthcheck_peer::success()
     set_keepalive();
 
     state.shared->rise_total++;
-    if (++state.shared->rise >= opts->rise) {
+    if (++state.shared->rise >= opts->rise || state.shared->fall_total == 0) {
         state.shared->fall = 0;
         up();
     }

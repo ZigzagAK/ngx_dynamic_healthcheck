@@ -133,12 +133,6 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
             if (state.local == NULL)
                 goto nomem;
 
-            if (state.shared->rise_total + state.shared->fall_total == 0) {
-
-                state.shared->rise = event->conf->shared->rise - 1;
-                state.shared->rise_total = state.shared->rise;
-            }
-
             state.local->module = event->conf->config.module;
             state.local->upstream = event->conf->config.upstream;
 
