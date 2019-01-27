@@ -4,6 +4,7 @@ extern "C" {
 
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <assert.h>
 
 }
 
@@ -110,25 +111,23 @@ parse_header(ngx_http_request_t *r, ngx_buf_t *buf, ngx_keyval_t *h)
     switch (ngx_http_parse_header_line(r, buf, 1)) {
 
         case NGX_OK:
+
             break;
 
         case NGX_AGAIN:
+
             return NGX_AGAIN;
 
         case NGX_HTTP_PARSE_HEADER_DONE:
+
             return NGX_HTTP_PARSE_HEADER_DONE;
 
         case NGX_HTTP_PARSE_INVALID_HEADER:
-            return NGX_DECLINED;
-
         case NGX_ERROR:
         default:
             return NGX_ERROR;
     }
 
-    if (r->header_name_end == r->header_name_start)
-        return NGX_DECLINED;
-    
     h->key.len = r->header_name_end - r->header_name_start;
     h->key.data = r->header_name_start;
     h->key.data[h->key.len] = 0;
@@ -190,50 +189,47 @@ ngx_int_t
 healthcheck_http_helper::parse_headers(ngx_dynamic_hc_local_node_t *state)
 {
     ngx_keyval_t  h;
-    ngx_int_t     rc;
 
     for (;;) {
 
-        rc = parse_header(&r, state->buf, &h);
+        switch (parse_header(&r, state->buf, &h)) {
 
-        ngx_log_error(NGX_LOG_DEBUG,
-                      state->pc.connection->log, 0,
-                      "[%V] %V: %V addr=%V, fd=%d http"
-                      " on_recv() ngx_http_read_header, rc=%d",
-                      &module, &upstream, &server, &name,
-                      state->pc.connection->fd, rc);
+            case NGX_AGAIN:
 
-        if (rc == NGX_OK) {
+                return NGX_AGAIN;
 
-            if (ngx_strcmp(h.key.data, "content-length") == 0)
-                content_length = ngx_atoi(h.value.data, h.value.len);
+            case NGX_OK:
 
-            if (ngx_strcmp(h.key.data, "transfer-encoding") == 0)
-                chunked = ngx_strcmp(h.value.data, "chunked") == 0;
+                ngx_log_error(NGX_LOG_DEBUG,
+                              state->pc.connection->log, 0,
+                              "[%V] %V: %V addr=%V, "
+                              "fd=%d http on_recv() header: %V=%V",
+                              &module, &upstream, &server, &name,
+                              state->pc.connection->fd,
+                              &h.key, &h.value);
 
-            ngx_log_error(NGX_LOG_DEBUG,
-                          state->pc.connection->log, 0,
-                          "[%V] %V: %V addr=%V, "
-                          "fd=%d http on_recv() header: %V=%V",
-                          &module, &upstream, &server, &name,
-                          state->pc.connection->fd,
-                          &h.key, &h.value);
-            continue;
+                if (ngx_strcmp(h.key.data, "content-length") == 0)
+                    content_length = ngx_atoi(h.value.data, h.value.len);
+
+                if (ngx_strcmp(h.key.data, "transfer-encoding") == 0)
+                    chunked = ngx_strcmp(h.value.data, "chunked") == 0;
+
+                break;
+
+            case NGX_HTTP_PARSE_HEADER_DONE:
+
+                return NGX_HTTP_PARSE_HEADER_DONE;
+
+            case NGX_ERROR:
+            default:
+                return NGX_ERROR;
         }
 
-        if (rc == NGX_AGAIN)
-            return NGX_AGAIN;
-
-        if (rc == NGX_HTTP_PARSE_HEADER_DONE)
-            break;
-
-        if (rc == NGX_DECLINED)
-            continue;
-
-        return NGX_ERROR;
     }
 
-    return NGX_HTTP_PARSE_HEADER_DONE;
+    assert(0);
+
+    return NGX_ABORT;
 }
 
 
