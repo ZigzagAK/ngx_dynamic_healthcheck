@@ -100,6 +100,7 @@ __DATA__
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like
@@ -197,6 +198,7 @@ u2 127.0.0.6:6006 1 0
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like
@@ -272,6 +274,7 @@ u2 127.0.0.6:6006 1 0
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like
@@ -372,6 +375,7 @@ u1 127.0.0.1:6001 0 1
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like
@@ -505,6 +509,7 @@ u1 127.0.0.1:6000 0
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body
@@ -571,6 +576,7 @@ u1 127.0.0.2:6001 1 0 1 0
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like
@@ -638,6 +644,7 @@ u1 127.0.0.2:6001 1 0 1 0
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like
@@ -703,6 +710,7 @@ u1 127.0.0.2:6001 1 0 1 0
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- timeout: 3
@@ -768,6 +776,7 @@ u1 127.0.0.1:6001 0 1
             end
         }
     }
+--- timeout: 3
 --- request
     GET /test
 --- response_body_like

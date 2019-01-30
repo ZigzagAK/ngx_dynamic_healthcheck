@@ -120,6 +120,7 @@ ngx_dynamic_healthcheck_peer::fail(ngx_flag_t skip)
     if (++state.shared->fall >= opts->fall) {
         state.shared->rise = 0;
         down(skip);
+        state.shared->down = 1;
     }
 
     completed();
@@ -141,6 +142,7 @@ ngx_dynamic_healthcheck_peer::success()
     if (++state.shared->rise >= opts->rise || state.shared->fall_total == 0) {
         state.shared->fall = 0;
         up();
+        state.shared->down = 0;
     }
 
     completed();

@@ -46,6 +46,7 @@ typedef struct {
 
     ngx_msec_t                     touched;
     time_t                         checked;
+    ngx_flag_t                     down;
 
     ngx_dynamic_hc_shared_t       *state;
 } ngx_dynamic_hc_shared_node_t;
@@ -83,6 +84,7 @@ typedef struct ngx_dynamic_hc_stat_s {
     ngx_int_t                      rise;
     ngx_int_t                      fall_total;
     ngx_int_t                      rise_total;
+    ngx_flag_t                     down;
 } ngx_dynamic_hc_stat_t;
 
 

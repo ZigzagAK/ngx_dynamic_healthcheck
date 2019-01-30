@@ -136,6 +136,8 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
             state.local->module = event->conf->config.module;
             state.local->upstream = event->conf->config.upstream;
 
+            state.shared->down = peer->down;
+
             if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0)
 
                 addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_tcp<PeerT>),

@@ -43,7 +43,7 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
     ngx_shmtx_lock(&slab->mutex);
 
     disabled_hosts = &conf->shared->disabled_hosts;
-    
+
     for (i = 0; i < disabled_hosts->len; i++) {
         if (ngx_memn2cmp(host->data, disabled_hosts->data[i].data,
                          host->len, disabled_hosts->data[i].len) == 0) {

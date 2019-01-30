@@ -37,6 +37,7 @@ ngx_dynamic_healthcheck_state_stat(ngx_dynamic_hc_state_t *state,
     stat->rise = shared->rise;
     stat->fall_total = shared->fall_total;
     stat->rise_total = shared->rise_total;
+    stat->down = shared->down;
 
     ngx_shmtx_unlock(&slab->mutex);
 
