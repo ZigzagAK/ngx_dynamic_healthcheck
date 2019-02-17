@@ -152,7 +152,7 @@ function extract_downloads() {
   for d in $(ls -1 *.tar.gz)
   do
     echo "Extracting $d"
-    tar zxf $d -C ../build --no-overwrite-dir --keep-old-files 2>/dev/null
+    tar zxf $d -C ../build --keep-old-files 2>/dev/null
   done
 
   cd ..

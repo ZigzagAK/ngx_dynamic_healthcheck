@@ -61,7 +61,7 @@ function build_luajit() {
 function build_cJSON() {
   echo "Build cjson"
   cd lua-cjson
-  PREFIX="$JIT_PREFIX/usr/local" make > /dev/null
+  LUA_INCLUDE_DIR="$JIT_PREFIX/usr/local/include/luajit-2.1" LDFLAGS="-L$JIT_PREFIX/usr/local/lib -lluajit-5.1" make > /dev/null
   r=$?
   if [ $r -ne 0 ]; then
     exit $r
@@ -201,7 +201,7 @@ function extract_downloads() {
   for d in $(ls -1 *.tar.gz)
   do
     echo "Extracting $d"
-    tar zxf $d -C ../build --no-overwrite-dir --keep-old-files 2>/dev/null
+    tar zxf $d -C ../build --keep-old-files 2>/dev/null
   done
 
   cd ..
