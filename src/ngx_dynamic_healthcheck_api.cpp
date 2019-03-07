@@ -775,9 +775,9 @@ ngx_dynamic_healthcheck_api_base::get_srv_conf(
    ngx_http_upstream_srv_conf_t *uscf)
 {
     extern ngx_module_t ngx_http_dynamic_healthcheck_module;
-    return (ngx_dynamic_healthcheck_conf_t *)
-        ngx_http_conf_upstream_srv_conf(uscf,
-            ngx_http_dynamic_healthcheck_module);
+    return (ngx_dynamic_healthcheck_conf_t *)(
+        uscf->srv_conf != NULL ? ngx_http_conf_upstream_srv_conf(uscf,
+            ngx_http_dynamic_healthcheck_module) : NULL);
 }
 
 
@@ -786,11 +786,10 @@ ngx_dynamic_healthcheck_api_base::get_srv_conf(
     ngx_stream_upstream_srv_conf_t *uscf)
 {
     extern ngx_module_t ngx_stream_dynamic_healthcheck_module;
-    return (ngx_dynamic_healthcheck_conf_t *)
-        ngx_stream_conf_upstream_srv_conf(uscf,
-            ngx_stream_dynamic_healthcheck_module);
+    return (ngx_dynamic_healthcheck_conf_t *)(
+        uscf->srv_conf != NULL ? ngx_stream_conf_upstream_srv_conf(uscf,
+            ngx_stream_dynamic_healthcheck_module) : NULL);
 }
-
 
 
 static ngx_int_t

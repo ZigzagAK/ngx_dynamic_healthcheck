@@ -763,7 +763,13 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
     }
  
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+
         conf = ngx_dynamic_healthcheck_api_base::get_srv_conf(uscf[i]);
+        if (conf == NULL)
+            continue;
+
+        if (conf->shared->type.len == 0)
+            continue;
 
         if (upstream->not_found
             || ngx_memn2cmp(upstream->data, conf->shared->upstream.data,
@@ -805,6 +811,12 @@ skip:
 
     out->buf->last_buf = (r == r->main) ? 1: 0;
     out->buf->last_in_chain = 1;
+
+    if (!upstream->not_found && start->next == NULL) {
+        // upstream not found
+        start->buf->last = start->buf->start;
+        return start;
+    }
 
     return upstream->not_found ? start : start->next;
 }
@@ -1269,7 +1281,13 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
     }
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+
         conf = ngx_dynamic_healthcheck_api_base::get_srv_conf(uscf[i]);
+        if (conf == NULL)
+            continue;
+
+        if (conf->shared->type.len == 0)
+            continue;
 
         if (upstream->not_found
             || ngx_memn2cmp(upstream->data, conf->shared->upstream.data,
@@ -1312,6 +1330,12 @@ skip:
     out->buf->last_buf = (r == r->main) ? 1: 0;
     out->buf->last_in_chain = 1;
 
+    if (!upstream->not_found && start->next == NULL) {
+        // upstream not found
+        start->buf->last = start->buf->start;
+        return start;
+    }
+
     return upstream->not_found ? start : start->next;
 }
 
@@ -1353,8 +1377,17 @@ ngx_http_dynamic_healthcheck_status_handler(ngx_http_request_t *r)
     for (tmp = out; tmp; tmp = tmp->next)
         content_length += (tmp->buf->last - tmp->buf->start);
 
-    r->headers_out.content_type = json;
-    r->headers_out.content_length_n = content_length;
+    if (content_length != 0) {
+        r->headers_out.status = NGX_HTTP_OK;
+        r->headers_out.content_type = json;
+        r->headers_out.content_length_n = content_length;
+    } else {
+        r->headers_out.status = NGX_HTTP_NOT_FOUND;
+        out->buf->last = ngx_snprintf(out->buf->last,
+                                      out->buf->end - out->buf->last,
+                                      "not found");
+        r->headers_out.content_length_n = 9;
+    }
 
     rc = ngx_http_send_header(r);
 

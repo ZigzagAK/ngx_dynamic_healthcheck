@@ -281,7 +281,7 @@ nomem:
 }
 
 
-ngx_inline ngx_int_t
+static ngx_int_t
 ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
 {
     ngx_dynamic_healthcheck_conf_t *conf;
