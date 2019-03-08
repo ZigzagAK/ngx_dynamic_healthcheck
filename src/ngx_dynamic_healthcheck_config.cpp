@@ -121,7 +121,7 @@ ngx_dynamic_healthcheck_check(ngx_conf_t *cf, ngx_command_t *cmd,
         conf->config.type.data = (u_char *) "tcp";
         conf->config.type.len = 3;
     }
-    
+
     return NGX_CONF_OK;
 
 fail:

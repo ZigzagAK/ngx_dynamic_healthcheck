@@ -328,6 +328,9 @@ public:
             if (uscf[i]->srv_conf == NULL)
                 continue;
 
+            if (uscf[i]->shm_zone == NULL)
+                continue;
+
             if (upstream.len == 0)
                 lua_pushlstring(L, (char *) uscf[i]->host.data,
                                 uscf[i]->host.len);
@@ -539,14 +542,18 @@ public:
         now = tp->sec * 1000 + tp->msec;
         
         for (i = 0; i < umcf->upstreams.nelts; i++) {
-            if (uscf[i]->srv_conf == NULL)
-                continue;
 
             if (ngx_process == NGX_PROCESS_WORKER
                 && i % ccf->worker_processes != ngx_worker)
                 continue;
 
+            if (uscf[i]->shm_zone == NULL)
+                continue;
+
             conf = get_srv_conf(uscf[i]);
+
+            if (conf == NULL)
+                continue;
 
             if (conf->shared == NULL)
                 continue;

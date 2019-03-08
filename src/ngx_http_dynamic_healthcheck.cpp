@@ -32,7 +32,6 @@ ngx_http_dynamic_healthcheck_status(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 
 
-
 static ngx_command_t ngx_http_dynamic_healthcheck_commands[] = {
 
     { ngx_string("healthcheck"),
@@ -412,10 +411,18 @@ ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
 
     if (main_conf->config.buffer_size == NGX_CONF_UNSET_SIZE)
         main_conf->config.buffer_size = ngx_pagesize - sizeof(ngx_pool_t) - 1;
-    
+
     conf = (ngx_dynamic_healthcheck_conf_t *)
         ngx_http_conf_upstream_srv_conf(uscf,
             ngx_http_dynamic_healthcheck_module);
+
+    if (conf->config.type.len != 0 && uscf->shm_zone == NULL) {
+        ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+            "'check' directive requires "
+            "'zone' directive in upstream %V in %s:%ud",
+            &uscf->host, uscf->file_name, uscf->line);
+        return NGX_ERROR;
+    }
 
     ngx_conf_merge_str_value(conf->config.type, main_conf->config.type);
     ngx_conf_merge_uint_value(conf->config.keepalive,
@@ -763,6 +770,9 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
     }
  
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+
+        if (uscf[i]->shm_zone == NULL)
+            continue;
 
         conf = ngx_dynamic_healthcheck_api_base::get_srv_conf(uscf[i]);
         if (conf == NULL)
@@ -1281,6 +1291,9 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
     }
 
     for (i = 0; i < umcf->upstreams.nelts; i++) {
+
+        if (uscf[i]->shm_zone == NULL)
+            continue;
 
         conf = ngx_dynamic_healthcheck_api_base::get_srv_conf(uscf[i]);
         if (conf == NULL)

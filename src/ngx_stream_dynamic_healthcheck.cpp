@@ -307,6 +307,14 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
         ngx_stream_conf_upstream_srv_conf(uscf,
             ngx_stream_dynamic_healthcheck_module);
 
+    if (conf->config.type.len != 0 && uscf->shm_zone == NULL) {
+        ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+            "'check' directive requires "
+            "'zone' directive in upstream %V in %s:%ud",
+            &uscf->host, uscf->file_name, uscf->line);
+        return NGX_ERROR;
+    }
+
     ngx_conf_merge_str_value(conf->config.type, main_conf->config.type);
     ngx_conf_merge_value(conf->config.passive,
         main_conf->config.passive, 0);
