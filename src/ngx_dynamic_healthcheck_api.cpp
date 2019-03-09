@@ -269,7 +269,7 @@ nomem:
 
 #ifdef _WITH_LUA_API
 
-void
+int
 ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
@@ -278,14 +278,14 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
 
     if (conf->shared == NULL) {
         lua_pushnil(L);
-        return;
+        return 1;
     }
 
     opts = conf->shared;
 
     if (opts->type.data == NULL) {
         lua_pushnil(L);
-        return;
+        return 1;
     }
 
     ngx_shmtx_lock(&conf->peers.shared->slab->mutex);
@@ -410,6 +410,8 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
     }
 
     ngx_shmtx_unlock(&conf->peers.shared->slab->mutex);
+
+    return 1;
 }
 
 
@@ -508,7 +510,7 @@ ngx_http_lua_get_req(lua_State *L)
 
 
 int
-ngx_dynamic_healthcheck_api_base::do_update(lua_State *L,
+ngx_dynamic_healthcheck_api_base::do_lua_update(lua_State *L,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
     ngx_dynamic_healthcheck_opts_t  opts;
@@ -691,6 +693,16 @@ get_status(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf)
     primary = (PeersT *) uscf->peer.data;
     peers = primary;
 
+    if (conf->shared == NULL) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    if (conf->shared->type.data == NULL) {
+        lua_pushnil(L);
+        return 1;
+    }
+
     lua_newtable(L);
 
     ngx_rwlock_rlock(&primary->rwlock);
@@ -735,7 +747,7 @@ get_status(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf)
 
 
 int
-ngx_dynamic_healthcheck_api_base::do_status(lua_State *L,
+ngx_dynamic_healthcheck_api_base::do_lua_status(lua_State *L,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
     if (ngx_strcmp(conf->config.module.data, NGX_DH_MODULE_HTTP.data) == 0)

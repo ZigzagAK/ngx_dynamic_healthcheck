@@ -146,7 +146,11 @@ u1 127.0.0.2:6002 0 0
             ngx.sleep(1)
             local cjson = require "cjson"
             -- disable
-            hc.disable_host("127.0.0.1:6001", true)
+            local ok, err = hc.disable_host("127.0.0.1:6001", true)
+            if not ok then
+              ngx.print(err)
+              return
+            end
             local data, err = hc.get()
             if not data then
               ngx.print(err)
@@ -401,7 +405,11 @@ u1 127.0.0.2:6002 0 0
             ngx.sleep(1)
             local cjson = require "cjson"
             -- disable
-            hc.disable_host("127.0.0.1:6001", true)
+            local ok, err = hc.disable_host("127.0.0.1:6001", true)
+            if not ok then
+              ngx.print(err)
+              return
+            end
             local data, err = hc.get()
             if not data then
               ngx.print(err)

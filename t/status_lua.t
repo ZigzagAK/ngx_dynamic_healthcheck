@@ -208,3 +208,43 @@ u2 127.0.0.5:6005 1 1
 u2 127.0.0.6:6006 1 0
 
 
+=== TEST 3: upstream not found
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+--- config
+    location /test {
+        content_by_lua_block {
+            local hc = require "ngx.healthcheck"
+            local data, err = hc.status("notfound")
+            ngx.say(err)
+        }
+    }
+--- request
+    GET /test
+--- response_body
+upstream not found
+
+
+=== TEST 4: stream upstream not found
+--- stream_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+--- stream_server_config
+    proxy_pass u1;
+--- config
+    location /test {
+        content_by_lua_block {
+            local hc = require "ngx.healthcheck.stream"
+            local data, err = hc.status("notfound")
+            ngx.say(err)
+        }
+    }
+--- request
+    GET /test
+--- response_body
+upstream not found

@@ -795,7 +795,7 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
             if (next == NULL)
                 return NULL;
 
-            if (upstream->not_found && i != umcf->upstreams.nelts - 1)
+            if (upstream->not_found)
                 next->buf->last = ngx_snprintf(next->buf->last,
                                                next->buf->end - next->buf->last,
                                                ",");
@@ -808,9 +808,14 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
         }
     }
 
-    if (upstream->not_found)
+    if (upstream->not_found) {
+        if (out->buf->last > out->buf->start && *(out->buf->last - 3) == ',') {
+            ngx_memmove(out->buf->last - 3, out->buf->last - 2, 2);
+            out->buf->last--;
+        }
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last, "}"CRLF);
+    }
 
 skip:
 
@@ -1316,7 +1321,7 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
             if (next == NULL)
                 return NULL;
 
-            if (upstream->not_found && i != umcf->upstreams.nelts - 1)
+            if (upstream->not_found)
                 next->buf->last = ngx_snprintf(next->buf->last,
                                                next->buf->end - next->buf->last,
                                                ",");
@@ -1329,9 +1334,14 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
         }
     }
 
-    if (upstream->not_found)
+    if (upstream->not_found) {
+        if (out->buf->last > out->buf->start && *(out->buf->last - 3) == ',') {
+            ngx_memmove(out->buf->last - 3, out->buf->last - 2, 2);
+            out->buf->last--;
+        }
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last, "}"CRLF);
+    }
 
 skip:
 

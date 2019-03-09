@@ -266,3 +266,154 @@ u1 tcp 2 1 1500 60
     GET /test
 --- response_body_like
 u1 ssl 2 1 1500 60
+
+
+=== TEST 7: no healthcheck
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+--- config
+    location /get {
+      healthcheck_get;
+    }
+--- request
+    GET /get?upstream=u1
+--- error_code: 404
+--- response_body: not found
+
+
+=== TEST 8: stream no healthcheck
+--- stream_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+--- stream_server_config
+    proxy_pass u1;
+--- config
+    location /get {
+      healthcheck_get;
+    }
+--- request
+    GET /get?upstream=u1&stream=
+--- error_code: 404
+--- response_body: not found
+
+
+=== TEST 9: healthcheck + no healthcheck
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+    upstream u2 {
+        zone shm-u2 128k;
+        server 127.0.0.1:6001;
+        check type=tcp fall=2 rise=1 timeout=1500 interval=60;
+    }
+--- config
+    location /get {
+      healthcheck_get;
+    }
+    location /test {
+        content_by_lua_block {
+            local resp = assert(ngx.location.capture("/get"))
+            if resp.status ~= ngx.HTTP_OK then
+              ngx.say(resp.status)
+            end
+            ngx.log(ngx.INFO, resp.body)
+            local cjson = require "cjson"
+            local data = cjson.decode(resp.body)
+            if not data["u2"] then
+              return ngx.say("u2 not found")
+            end
+            if data["u1"] then
+              return ngx.say("u1 present")
+            end
+            ngx.say(data["u2"].type)
+        }
+    }
+--- request
+    GET /test
+--- response_body
+tcp
+
+
+=== TEST 10: stream healthcheck + no healthcheck
+--- stream_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+    upstream u2 {
+        zone shm-u2 128k;
+        server 127.0.0.1:6001;
+        check type=tcp fall=2 rise=1 timeout=1500 interval=60;
+    }
+--- stream_server_config
+    proxy_pass u1;
+--- config
+    location /get {
+      healthcheck_get;
+    }
+    location /test {
+        content_by_lua_block {
+            local resp = assert(ngx.location.capture("/get?stream="))
+            if resp.status ~= ngx.HTTP_OK then
+              ngx.say(resp.status)
+            end
+            ngx.log(ngx.INFO, resp.body)
+            local cjson = require "cjson"
+            local data = cjson.decode(resp.body)
+            if not data then
+              return ngx.say(err)
+            end
+            if not data["u2"] then
+              return ngx.say("u2 not found")
+            end
+            if data["u1"] then
+              return ngx.say("u1 present")
+            end
+            ngx.say(data["u2"].type)
+        }
+    }
+--- request
+    GET /test
+--- response_body
+tcp
+
+
+=== TEST 11: upstream not found
+--- http_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+--- config
+    location /get {
+      healthcheck_get;
+    }
+--- request
+    GET /get?upstream=notfound
+--- error_code: 404
+--- response_body: not found
+
+
+=== TEST 12: stream upstream not found
+--- stream_config
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001;
+    }
+--- stream_server_config
+    proxy_pass u1;
+--- config
+    location /get {
+      healthcheck_get;
+    }
+--- request
+    GET /get?upstream=notfound&stream=
+--- error_code: 404
+--- response_body: not found

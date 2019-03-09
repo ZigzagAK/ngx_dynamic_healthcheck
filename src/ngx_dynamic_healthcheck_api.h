@@ -44,6 +44,12 @@ extern "C" {
 #define NGX_DYNAMIC_UPDATE_OPT_PASSIVE         32768
 
 
+ngx_inline ngx_flag_t str_eq(ngx_str_t s1, ngx_str_t s2)
+{
+    return ngx_memn2cmp(s1.data, s2.data, s1.len, s2.len) == 0;
+}
+
+
 class ngx_dynamic_healthcheck_api_base {
     static ngx_int_t
     parse(ngx_dynamic_healthcheck_conf_t *conf,
@@ -93,14 +99,14 @@ protected:
 
 #ifdef _WITH_LUA_API
 
-    static void
+    static int
     healthcheck_push(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf);
 
     static int
-    do_update(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf);
+    do_lua_update(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf);
 
     static int
-    do_status(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf);
+    do_lua_status(lua_State *L, ngx_dynamic_healthcheck_conf_t *conf);
 
 #endif
 };
@@ -109,10 +115,18 @@ protected:
 template <class M, class S> class ngx_dynamic_healthcheck_api :
     private ngx_dynamic_healthcheck_api_base {
 
+#ifdef _WITH_LUA_API
+
+public:
+
+    typedef int (fun_t)(lua_State *L, ngx_dynamic_healthcheck_conf_t *uscf);
+
+#endif
+
 private:
 
 #ifdef _WITH_LUA_API
-    
+
     static int
     lua_error(lua_State *L, const char *err)
     {
@@ -122,7 +136,7 @@ private:
     }
 
     static int
-    do_update(lua_State *L, S *uscf)
+    do_lua_fun(fun_t f, lua_State *L, S *uscf)
     {
         ngx_dynamic_healthcheck_conf_t *conf;
 
@@ -133,35 +147,25 @@ private:
         if (conf == NULL)
             return lua_error(L, "can't get healthcheck module configuration");
 
-        return ngx_dynamic_healthcheck_api_base::do_update(L, conf);
-    }
-
-    static int
-    do_status(lua_State *L, S *uscf)
-    {
-        ngx_dynamic_healthcheck_conf_t *conf;
-
-        if (uscf->shm_zone == NULL)
-            return lua_error(L, "only for upstream with 'zone'");
-
-        conf = get_srv_conf(uscf);
-        if (conf == NULL)
-            return lua_error(L, "can't get healthcheck module configuration");
-
-        return ngx_dynamic_healthcheck_api_base::do_status(L, conf);
+        return f(L, conf);
     }
 
 #endif
 
+    static ngx_dynamic_healthcheck_conf_t *
+    healthcheck_conf(S *uscf)
+    {
+        if (uscf->shm_zone == NULL)
+            return NULL;
+
+        return get_srv_conf(uscf);
+    }
+
     static ngx_int_t
     do_update(S *uscf, ngx_dynamic_healthcheck_opts_t *opts, ngx_flag_t flags)
     {
-        ngx_dynamic_healthcheck_conf_t *conf;
+        ngx_dynamic_healthcheck_conf_t *conf = healthcheck_conf(uscf);
 
-        if (uscf->shm_zone == NULL)
-            return NGX_ERROR;
-
-        conf = get_srv_conf(uscf);
         if (conf == NULL)
             return NGX_ERROR;
 
@@ -171,12 +175,8 @@ private:
     static ngx_int_t
     do_disable(S *uscf, ngx_flag_t disable)
     {
-        ngx_dynamic_healthcheck_conf_t *conf;
+        ngx_dynamic_healthcheck_conf_t *conf = healthcheck_conf(uscf);
 
-        if (uscf->shm_zone == NULL)
-            return NGX_ERROR;
-
-        conf = get_srv_conf(uscf);
         if (conf == NULL)
             return NGX_ERROR;
 
@@ -186,12 +186,8 @@ private:
     static ngx_int_t
     do_disable_host(S *uscf, ngx_str_t *host, ngx_flag_t disable)
     {
-        ngx_dynamic_healthcheck_conf_t *conf;
+        ngx_dynamic_healthcheck_conf_t *conf = healthcheck_conf(uscf);
 
-        if (uscf->shm_zone == NULL)
-            return NGX_ERROR;
-
-        conf = get_srv_conf(uscf);
         if (conf == NULL)
             return NGX_ERROR;
 
@@ -218,51 +214,48 @@ public:
         umcf = get_upstream_conf(umcf);
         uscf = (S **) umcf->upstreams.elts;
 
-        for (i = 0; i < umcf->upstreams.nelts; i++) {
-            if (uscf[i]->srv_conf != NULL) {
-                if (ngx_memn2cmp(opts->upstream.data, uscf[i]->host.data,
-                                 opts->upstream.len, uscf[i]->host.len) == 0)
-                    return ngx_dynamic_healthcheck_api<M, S>::do_update(uscf[i],
-                                                                        opts,
-                                                                        flags);
-            }
-        }
+        for (i = 0; i < umcf->upstreams.nelts; i++)
+            if (str_eq(opts->upstream, uscf[i]->host))
+                return ngx_dynamic_healthcheck_api<M, S>::do_update(uscf[i],
+                                                                    opts,
+                                                                    flags);
 
         return NGX_DECLINED;
     }
 
     static ngx_int_t
-    disable(ngx_str_t *upstream, ngx_flag_t disable)
+    disable(ngx_str_t upstream, ngx_flag_t disable)
     {
         ngx_uint_t    i;
         M            *umcf = NULL;
         S           **uscf;
         ngx_int_t     rc;
 
-        if (upstream->len == 0)
+        if (upstream.len == 0)
             return NGX_ERROR;
 
         umcf = get_upstream_conf(umcf);
         uscf = (S **) umcf->upstreams.elts;
 
         for (i = 0; i < umcf->upstreams.nelts; i++) {
-            if (uscf[i]->srv_conf != NULL) {
-                if (ngx_memn2cmp(upstream->data, uscf[i]->host.data,
-                                 upstream->len, uscf[i]->host.len) == 0) {
-                    rc = ngx_dynamic_healthcheck_api<M, S>::do_disable
-                        (uscf[i], disable);
-                    if (rc == NGX_OK)
-                        ngx_dynamic_healthcheck_api<M, S>::refresh_timers();
-                    return rc;
-                }
-            }
+
+            if (!str_eq(upstream, uscf[i]->host))
+                continue;
+
+            rc = ngx_dynamic_healthcheck_api<M, S>::do_disable
+                (uscf[i], disable);
+
+            if (rc == NGX_OK)
+                ngx_dynamic_healthcheck_api<M, S>::refresh_timers();
+
+            return rc;
         }
 
         return NGX_DECLINED;
     }
 
     static ngx_int_t
-    disable_host(ngx_str_t *upstream, ngx_str_t *host, ngx_flag_t disable)
+    disable_host(ngx_str_t upstream, ngx_str_t *host, ngx_flag_t disable)
     {
         ngx_uint_t    i;
         M            *umcf = NULL;
@@ -273,22 +266,25 @@ public:
         uscf = (S **) umcf->upstreams.elts;
 
         for (i = 0; i < umcf->upstreams.nelts; i++) {
-            if (uscf[i]->srv_conf != NULL) {
-                if (upstream->len == 0
-                    || ngx_memn2cmp(upstream->data, uscf[i]->host.data,
-                                    upstream->len, uscf[i]->host.len) == 0) {
-                    switch (ngx_dynamic_healthcheck_api<M, S>::do_disable_host
-                        (uscf[i], host, disable)) {
-                        case NGX_OK:
-                            updated++;
-                            break;
-                        case NGX_ERROR:
-                            return NGX_ERROR;
-                    }
-                    if (upstream->len != 0)
-                        break;
-                }
+
+            if (upstream.len != 0 && !str_eq(upstream, uscf[i]->host))
+                continue;
+
+            switch (ngx_dynamic_healthcheck_api<M, S>::do_disable_host
+                        (uscf[i], host, disable))
+            {
+                case NGX_OK:
+                    updated++;
+                    break;
+
+                case NGX_ERROR:
+                default:
+                    if (upstream.len != 0)
+                        return NGX_ERROR;
             }
+
+            if (upstream.len != 0)
+                break;
         }
 
         if (updated == 0)
@@ -308,13 +304,14 @@ public:
         M             *umcf = NULL;
         S            **uscf;
         ngx_str_t      upstream;
-        ngx_flag_t     not_found = 1;
 
         ngx_str_null(&upstream);
 
         if (lua_gettop(L) == 1 && !lua_isnil(L, 1)) {
             upstream.data = (u_char *) luaL_checkstring(L, 1);
             upstream.len = ngx_strlen(upstream.data);
+            if (upstream.len == 0)
+                return luaL_error(L, "non empty upstream required");
         } else if (lua_gettop(L) > 1)
             return lua_error(L, "1 or 0 arguments expected");
 
@@ -325,34 +322,41 @@ public:
             lua_newtable(L);
 
         for (i = 0; i < umcf->upstreams.nelts; i++) {
+
             if (uscf[i]->srv_conf == NULL)
                 continue;
 
-            if (uscf[i]->shm_zone == NULL)
+            if (upstream.len == 0 && uscf[i]->shm_zone == NULL)
                 continue;
 
-            if (upstream.len == 0)
-                lua_pushlstring(L, (char *) uscf[i]->host.data,
-                                uscf[i]->host.len);
+            if (upstream.len == 0 || str_eq(upstream, uscf[i]->host)) {
 
-            if (upstream.len == 0
-                || ngx_memn2cmp(upstream.data, uscf[i]->host.data,
-                                upstream.len, uscf[i]->host.len) == 0) {
-                healthcheck_push(L, get_srv_conf(uscf[i]));
-                not_found = 0;
+                if (upstream.len == 0)
+                    lua_pushlstring(L, (char *) uscf[i]->host.data,
+                                    uscf[i]->host.len);
+
+                ngx_dynamic_healthcheck_api<M, S>::do_lua_fun
+                    (&ngx_dynamic_healthcheck_api_base::healthcheck_push,
+                     L, uscf[i]);
+
+                if (upstream.len == 0) {
+
+                    lua_rawset(L, -3);
+                    continue;
+                }
+
+                if (!lua_isnil(L, -1))
+                    return 1;
+
+                lua_pushliteral(L, "no healthcheck");
+                return 2;
             }
-
-            if (upstream.len == 0)
-                lua_rawset(L, -3);
         }
 
-        if (not_found) {
-            lua_pushnil(L);
-            lua_pushliteral(L, "upstream not found");
-            return 2;
-        }
-        
-        return 1;
+        if (upstream.len == 0)
+            return 1;
+
+        return lua_error(L, "upstream not found");
     }
 
     static int
@@ -369,27 +373,22 @@ public:
         upstream.data = (u_char *) luaL_checkstring(L, 1);
         upstream.len = ngx_strlen(upstream.data);
 
+        if (upstream.len == 0)
+            return luaL_error(L, "non empty upstream required");
+
         if (!lua_istable(L, 2))
             return luaL_error(L, "table expected on 2nd argument");
 
         umcf = get_upstream_conf(umcf);
         uscf = (S **) umcf->upstreams.elts;
 
-        for (i = 0; i < umcf->upstreams.nelts; i++) {
-            if (uscf[i]->srv_conf != NULL) {
-                if (ngx_memn2cmp(upstream.data, uscf[i]->host.data,
-                                 upstream.len, uscf[i]->host.len) == 0) {
-                    ngx_dynamic_healthcheck_api<M, S>::do_update(L, uscf[i]);
-                    lua_pushboolean(L, 1);
-                    return 1;
-                }
-            }
-        }
+        for (i = 0; i < umcf->upstreams.nelts; i++)
+            if (str_eq(upstream, uscf[i]->host))
+                return ngx_dynamic_healthcheck_api<M, S>::do_lua_fun
+                    (&ngx_dynamic_healthcheck_api_base::do_lua_update,
+                     L, uscf[i]);
 
-        lua_pushnil(L);
-        lua_pushliteral(L, "upstream not found");
-
-        return 2;
+        return lua_error(L, "upstream not found");
     }
 
     static int
@@ -409,25 +408,32 @@ public:
         host.data = (u_char *) luaL_checkstring(L, 1);
         host.len = ngx_strlen(host.data);
 
+        if (host.len == 0)
+            return luaL_error(L, "non empty host required");
+
         disabled = lua_toboolean(L, 2);
 
         if (n == 3 && !lua_isnil(L, 3)) {
             upstream.data = (u_char *) luaL_checkstring(L, 3);
             upstream.len = ngx_strlen(upstream.data);
+            if (upstream.len == 0)
+                return luaL_error(L, "non empty upstream required");
         }
 
-        if (ngx_dynamic_healthcheck_api<M, S>::disable_host(&upstream,
-                                                            &host,
-                                                            disabled)
-                == NGX_DECLINED) {
-            lua_pushnil(L);
-            lua_pushliteral(L, "upstream not found");
-            return 2;
+        switch (ngx_dynamic_healthcheck_api<M, S>::disable_host(upstream,
+                                                                &host,
+                                                                disabled))
+        {
+            case NGX_OK:
+                lua_pushboolean(L, 1);
+                return 1;
+
+            case NGX_DECLINED:
+                return lua_error(L, "upstream not found");
+
         }
 
-        lua_pushboolean(L, 1);
-
-        return 1;
+        return lua_error(L, "only for upstream with 'zone'");
     }
 
     static int
@@ -445,18 +451,23 @@ public:
         upstream.data = (u_char *) luaL_checkstring(L, 1);
         upstream.len = ngx_strlen(upstream.data);
 
+        if (upstream.len == 0)
+            return luaL_error(L, "non empty upstream required");
+
         disabled = lua_toboolean(L, 2);
 
-        if (ngx_dynamic_healthcheck_api<M, S>::disable(&upstream, disabled)
-                == NGX_DECLINED) {
-            lua_pushnil(L);
-            lua_pushliteral(L, "upstream not found");
-            return 2;
+        switch (ngx_dynamic_healthcheck_api<M, S>::disable(upstream, disabled))
+        {
+            case NGX_OK:
+                lua_pushboolean(L, 1);
+                return 1;
+
+            case NGX_DECLINED:
+                return lua_error(L, "upstream not found");
+
         }
 
-        lua_pushboolean(L, 1);
-
-        return 1;
+        return lua_error(L, "only for upstream with 'zone'");
     }
 
     static int
@@ -466,13 +477,14 @@ public:
         M             *umcf = NULL;
         S            **uscf;
         ngx_str_t      upstream;
-        ngx_flag_t     not_found = 1;
 
         ngx_str_null(&upstream);
 
         if (lua_gettop(L) == 1 && !lua_isnil(L, 1)) {
             upstream.data = (u_char *) luaL_checkstring(L, 1);
             upstream.len = ngx_strlen(upstream.data);
+            if (upstream.len == 0)
+                return luaL_error(L, "non empty upstream required");
         } else if (lua_gettop(L) > 1)
             return lua_error(L, "1 or 0 arguments expected");
 
@@ -483,32 +495,41 @@ public:
             lua_newtable(L);
 
         for (i = 0; i < umcf->upstreams.nelts; i++) {
+
             if (uscf[i]->srv_conf == NULL)
                 continue;
 
-            if (upstream.len == 0)
-                lua_pushlstring(L, (char *) uscf[i]->host.data,
-                                uscf[i]->host.len);
+            if (upstream.len == 0 && uscf[i]->shm_zone == NULL)
+                continue;
 
-            if (upstream.len == 0
-                || ngx_memn2cmp(upstream.data, uscf[i]->host.data,
-                                upstream.len, uscf[i]->host.len) == 0) {
-                ngx_dynamic_healthcheck_api<M, S>::do_status
-                        (L, uscf[i]);
-                not_found = 0;
+            if (upstream.len == 0 || str_eq(upstream, uscf[i]->host)) {
+
+                if (upstream.len == 0)
+                    lua_pushlstring(L, (char *) uscf[i]->host.data,
+                                    uscf[i]->host.len);
+
+                ngx_dynamic_healthcheck_api<M, S>::do_lua_fun
+                    (&ngx_dynamic_healthcheck_api_base::do_lua_status,
+                     L, uscf[i]);
+
+                if (upstream.len == 0) {
+
+                    lua_rawset(L, -3);
+                    continue;
+                }
+
+                if (!lua_isnil(L, -1))
+                    return 1;
+
+                lua_pushliteral(L, "no healthcheck");
+                return 2;
             }
-
-            if (upstream.len == 0)
-                lua_rawset(L, -3);
         }
 
-        if (not_found) {
-            lua_pushnil(L);
-            lua_pushliteral(L, "upstream not found");
-            return 2;
-        }
-        
-        return 1;
+        if (upstream.len == 0)
+            return 1;
+
+        return lua_error(L, "upstream not found");
     }
 
 #endif
@@ -667,10 +688,10 @@ ngx_dynamic_healthcheck_disable(ngx_str_t module, ngx_str_t upstream,
 
     if (module.data == NGX_DH_MODULE_HTTP.data)
         return ngx_dynamic_healthcheck_api<ngx_http_upstream_main_conf_t,
-            ngx_http_upstream_srv_conf_t>::disable(&upstream, disable);
+            ngx_http_upstream_srv_conf_t>::disable(upstream, disable);
 
     return ngx_dynamic_healthcheck_api<ngx_stream_upstream_main_conf_t,
-               ngx_stream_upstream_srv_conf_t>::disable(&upstream, disable);
+               ngx_stream_upstream_srv_conf_t>::disable(upstream, disable);
 }
 
 
@@ -685,11 +706,11 @@ ngx_dynamic_healthcheck_disable_host(ngx_str_t module, ngx_str_t upstream,
 
     if (module.data == NGX_DH_MODULE_HTTP.data)
         return ngx_dynamic_healthcheck_api<ngx_http_upstream_main_conf_t,
-            ngx_http_upstream_srv_conf_t>::disable_host(&upstream, &host,
+            ngx_http_upstream_srv_conf_t>::disable_host(upstream, &host,
                                                         disable);
 
     return ngx_dynamic_healthcheck_api<ngx_stream_upstream_main_conf_t,
-               ngx_stream_upstream_srv_conf_t>::disable_host(&upstream, &host,
+               ngx_stream_upstream_srv_conf_t>::disable_host(upstream, &host,
                                                              disable);
 }
 
