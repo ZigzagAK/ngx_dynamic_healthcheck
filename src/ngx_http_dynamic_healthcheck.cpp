@@ -367,11 +367,11 @@ ngx_http_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
 static void
 ngx_http_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
 {
-    ngx_http_upstream_srv_conf_t  *uscf;
-    ngx_http_upstream_rr_peers_t  *primary, *peers;
-    ngx_http_upstream_rr_peer_t   *peer;
-    ngx_uint_t                     i;
-    ngx_dynamic_hc_stat_t          stat;
+    ngx_http_upstream_srv_conf_t   *uscf;
+    ngx_http_upstream_rr_peers_t   *primary, *peers;
+    ngx_http_upstream_rr_peer_t    *peer;
+    ngx_uint_t                      i;
+    ngx_dynamic_hc_stat_t           stat;
 
     uscf = (ngx_http_upstream_srv_conf_t *) conf->uscf;
 
@@ -385,6 +385,11 @@ ngx_http_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
             if (ngx_peer_excluded(&peer->name, conf)
                 || ngx_peer_excluded(&peer->server, conf))
                 continue;
+            if (ngx_peer_disabled(&peer->name, conf)
+                || ngx_peer_disabled(&peer->server, conf)) {
+                peer->down = 1;
+                continue;
+            }
             if (ngx_dynamic_healthcheck_state_stat(&conf->peers,
                     &peer->server, &peer->name, &stat) == NGX_OK) {
                 peer->down = stat.down;
@@ -573,15 +578,16 @@ serialize_num_array(ngx_pool_t *pool, ngx_num_array_t *a)
 
 
 static ngx_str_t *
-serialize_str_array(ngx_pool_t *pool, ngx_str_array_t *a)
+serialize_str_array(ngx_pool_t *pool, ngx_str_array_t *a, ngx_uint_t n)
 {
     ngx_buf_t  *tmp;
-    ngx_uint_t  i;
+    ngx_uint_t  i, j;
     ngx_str_t  *s;
     size_t      size = 0;
 
-    for (i = 0; i < a->len; i++)
-        size += (3 + a->data[i].len);
+    for (j = 0; j < n; j++)
+        for (i = 0; i < a[j].len; i++)
+            size += (3 + a[j].data[i].len);
 
     tmp = ngx_create_temp_buf(pool, size);
     if (tmp == NULL)
@@ -591,15 +597,16 @@ serialize_str_array(ngx_pool_t *pool, ngx_str_array_t *a)
     if (s == NULL)
         return &nomem;
 
-    for (i = 0; i < a->len; i++) {
-      tmp->last = ngx_snprintf(tmp->last, tmp->end - tmp->last, "\"%V\"",
-                               &a->data[i]);
-      if (i != a->len - 1)
-          tmp->last = ngx_snprintf(tmp->last, tmp->end - tmp->last, ",");
-    }
+    for (j = 0; j < n; j++)
+        for (i = 0; i < a[j].len; i++)
+          tmp->last = ngx_snprintf(tmp->last, tmp->end - tmp->last, "\"%V\",",
+                                   &a[j].data[i]);
 
     s->data = tmp->start;
     s->len = tmp->last - tmp->start;
+
+    if (s->len != 0)
+        s->data[s->len--] = 0;
 
     return s;
 }
@@ -646,15 +653,24 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
     ngx_flag_t   is_http = ngx_strncmp(shared->type.data, "http", 4) == 0;
     ngx_chain_t *out = (ngx_chain_t *) ngx_pcalloc(r->pool,
                                                    sizeof(ngx_chain_t));
+    ngx_str_array_t disabled[2] = {
+        shared->disabled_hosts,
+        shared->disabled_hosts_manual
+    };
+
+    ngx_str_array_t excluded[1] = {
+        shared->excluded_hosts
+    };
+
     if (out == NULL)
         return NULL;
-    
+
     out->buf = ngx_create_temp_buf(r->pool, ngx_pagesize);
     if (out->buf == NULL)
         return NULL;
 
     if (shared != NULL) {
-        ngx_shmtx_lock(&shared->state.slab->mutex);
+        SCOPED_SLAB_LOCK(shared->state.slab);
 
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last,
@@ -721,11 +737,9 @@ ngx_http_dynamic_healthcheck_get_hc(ngx_http_request_t *r,
                 &tab,
                 &tab, shared->disabled,
                 &tab, shared->off,
-                &tab, serialize_str_array(r->pool, &shared->disabled_hosts),
-                &tab, serialize_str_array(r->pool, &shared->excluded_hosts),
+                &tab, serialize_str_array(r->pool, disabled, 2),
+                &tab, serialize_str_array(r->pool, excluded, 1),
                 &tab);
-
-        ngx_shmtx_unlock(&shared->state.slab->mutex);
     }
 
     return out;

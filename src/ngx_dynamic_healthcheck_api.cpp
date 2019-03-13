@@ -40,17 +40,15 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
     ngx_str_array_t  *disabled_hosts;
     ngx_str_array_t   new_disabled_hosts;
 
-    ngx_shmtx_lock(&slab->mutex);
+    SCOPED_SLAB_LOCK(conf->peers.shared->slab);
 
-    disabled_hosts = &conf->shared->disabled_hosts;
+    disabled_hosts = &conf->shared->disabled_hosts_manual;
 
     for (i = 0; i < disabled_hosts->len; i++) {
         if (ngx_memn2cmp(host->data, disabled_hosts->data[i].data,
                          host->len, disabled_hosts->data[i].len) == 0) {
-            if (disable) {
-                ngx_shmtx_unlock(&slab->mutex);
+            if (disable)
                 return NGX_DECLINED;
-            }
 
             for (i++; i < disabled_hosts->len; i++)
                 disabled_hosts->data[i - 1] = disabled_hosts->data[i];
@@ -62,8 +60,6 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
 
             conf->shared->updated = 1;
 
-            ngx_shmtx_unlock(&slab->mutex);
-
             ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
                           "[%V] %V enable host: %V",
                           &conf->config.module, &conf->config.upstream,
@@ -73,16 +69,12 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
         }
     }
 
-    if (!disable) {
-        ngx_shmtx_unlock(&slab->mutex);
+    if (!disable)
         return NGX_DECLINED;
-    }
 
     if (disabled_hosts->len == disabled_hosts->reserved) {
-        ngx_memzero(&new_disabled_hosts, sizeof(ngx_str_array_t));
         if (ngx_shm_str_array_create(&new_disabled_hosts,
             ngx_max(2, disabled_hosts->reserved) * 2, slab) == NGX_ERROR) {
-            ngx_shmtx_unlock(&slab->mutex);
             return NGX_ERROR;
         }
         ngx_shm_str_array_copy(&new_disabled_hosts, disabled_hosts, slab);
@@ -92,16 +84,12 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
     assert(disabled_hosts->len < disabled_hosts->reserved);
 
     if (ngx_shm_str_copy(&disabled_hosts->data[disabled_hosts->len], host,
-                         slab) == NGX_ERROR) {
-        ngx_shmtx_unlock(&slab->mutex);
+                         slab) == NGX_ERROR)
         return NGX_ERROR;
-    }
 
     disabled_hosts->len++;
 
     conf->shared->updated = 1;
-    
-    ngx_shmtx_unlock(&slab->mutex);
 
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
                   "[%V] %V disable host: %V",
@@ -182,7 +170,7 @@ ngx_dynamic_healthcheck_api_base::do_update
 
     ngx_memzero(&sh, sizeof(ngx_dynamic_healthcheck_opts_t));
 
-    ngx_shmtx_lock(&slab->mutex);
+    SCOPED_SLAB_LOCK(conf->peers.shared->slab);
 
     if (flags & NGX_DYNAMIC_UPDATE_OPT_TYPE)
         b = b && NGX_OK == ngx_shm_str_copy(&sh.type, &opts->type, slab);
@@ -245,8 +233,6 @@ ngx_dynamic_healthcheck_api_base::do_update
 
     conf->shared->updated = 1;
 
-    ngx_shmtx_unlock(&slab->mutex);
-
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "[%V] %V update",
                   &conf->config.module, &conf->config.upstream);
 
@@ -261,8 +247,6 @@ nomem:
     ngx_shm_str_free(&sh.response_body, slab);
     ngx_shm_keyval_array_free(&sh.request_headers, slab);
     ngx_shm_num_array_free(&sh.response_codes, slab);
-
-    ngx_shmtx_unlock(&slab->mutex);
 
     return NGX_ERROR;
 }
@@ -288,7 +272,7 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
         return 1;
     }
 
-    ngx_shmtx_lock(&conf->peers.shared->slab->mutex);
+    SCOPED_SLAB_LOCK(conf->peers.shared->slab);
 
     lua_newtable(L);
 
@@ -319,6 +303,12 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
     for (i = 0; i < opts->disabled_hosts.len; i++) {
         lua_pushlstring(L, (char *) opts->disabled_hosts.data[i].data,
                         opts->disabled_hosts.data[i].len);
+        lua_rawseti(L, -2, i + 1);
+    }
+
+    for (i = 0; i < opts->disabled_hosts_manual.len; i++) {
+        lua_pushlstring(L, (char *) opts->disabled_hosts_manual.data[i].data,
+                        opts->disabled_hosts_manual.data[i].len);
         lua_rawseti(L, -2, i + 1);
     }
 
@@ -408,8 +398,6 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
 
         lua_setfield(L, -2, "command");
     }
-
-    ngx_shmtx_unlock(&conf->peers.shared->slab->mutex);
 
     return 1;
 }
@@ -514,7 +502,6 @@ ngx_dynamic_healthcheck_api_base::do_lua_update(lua_State *L,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
     ngx_dynamic_healthcheck_opts_t  opts;
-    ngx_slab_pool_t                *slab = conf->peers.shared->slab;
     ngx_uint_t                      i;
     int                             top = lua_gettop(L);
     ngx_http_request_t             *r;
@@ -526,8 +513,6 @@ ngx_dynamic_healthcheck_api_base::do_lua_update(lua_State *L,
         return luaL_error(L, "no request");
 
     ngx_memzero(&opts, sizeof(ngx_dynamic_healthcheck_opts_t));
-
-    ngx_shmtx_lock(&slab->mutex);
 
     opts.type      = get_field_string(L, 2, "type",
                                       &flags, NGX_DYNAMIC_UPDATE_OPT_TYPE);
@@ -653,8 +638,6 @@ ngx_dynamic_healthcheck_api_base::do_lua_update(lua_State *L,
 
 done:
 
-    ngx_shmtx_unlock(&slab->mutex);
-
     if (ngx_dynamic_healthcheck_api_base::do_update(conf, &opts, flags)
            == NGX_ERROR)
         return luaL_error(L, "no shared memory");
@@ -664,8 +647,6 @@ done:
     return 1;
 
 nomem:
-
-    ngx_shmtx_unlock(&slab->mutex);
 
     lua_settop(L, top);
 
@@ -972,7 +953,8 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
 {
     ngx_dynamic_healthcheck_opts_t  *shared = conf->shared;
     ngx_pool_t                      *pool;
-    ngx_str_t                        content, headers, codes, hosts;
+    ngx_str_t                        content, headers, codes;
+    ngx_str_t                        hosts, hosts_manual;
     FILE                            *f = NULL;
 
     if (shared->updated == 0)
@@ -1003,26 +985,32 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
     if (serialize_str_array(&shared->disabled_hosts, &hosts, pool) != NGX_OK)
         goto nomem;
 
+    if (serialize_str_array(&shared->disabled_hosts_manual, &hosts_manual, pool)
+            != NGX_OK)
+        goto nomem;
+
     if (serialize_num_array(&shared->response_codes, &codes, pool) != NGX_OK)
         goto nomem;
 
-    content.len = ngx_snprintf(content.data, 10240, "type:%V"              LF
-                                                    "fall:%d"              LF
-                                                    "rise:%d"              LF
-                                                    "timeout:%d"           LF
-                                                    "interval:%d"          LF
-                                                    "keepalive:%d"         LF
-                                                    "request_body:\"%V\""  LF
-                                                    "response_body:\"%V\"" LF
-                                                    "off:%d"               LF
-                                                    "disabled:%d"          LF
-                                                    "disabled_hosts:%V"    LF
-                                                    "port:%d"              LF
-                                                    "passive:%d"           LF
-                                                    "request_uri:%V"       LF
-                                                    "request_method:%V"    LF
-                                                    "request_headers:%V"   LF
-                                                    "response_codes:%V"    LF,
+    content.len = ngx_snprintf(content.data,
+                               10240, "type:%V"                   LF
+                                      "fall:%d"                   LF
+                                      "rise:%d"                   LF
+                                      "timeout:%d"                LF
+                                      "interval:%d"               LF
+                                      "keepalive:%d"              LF
+                                      "request_body:\"%V\""       LF
+                                      "response_body:\"%V\""      LF
+                                      "off:%d"                    LF
+                                      "disabled:%d"               LF
+                                      "disabled_hosts:%V"         LF
+                                      "disabled_hosts_manual:%V"  LF
+                                      "port:%d"                   LF
+                                      "passive:%d"                LF
+                                      "request_uri:%V"            LF
+                                      "request_method:%V"         LF
+                                      "request_headers:%V"        LF
+                                      "response_codes:%V"         LF,
                                &shared->type,
                                shared->fall,
                                shared->rise,
@@ -1034,6 +1022,7 @@ ngx_dynamic_healthcheck_api_base::save(ngx_dynamic_healthcheck_conf_t *conf,
                                shared->off,
                                shared->disabled,
                                &hosts,
+                               &hosts_manual,
                                shared->port,
                                shared->passive,
                                nvl_str(&shared->request_uri),
@@ -1175,23 +1164,24 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     const char                      *sep;
 
     static ngx_str_t re =
-        ngx_string("type:([^\n]+)"                LF
-                   "fall:(\\d+)"                  LF
-                   "rise:(\\d+)"                  LF
-                   "timeout:(\\d+)"               LF
-                   "interval:(\\d+)"              LF
-                   "keepalive:(\\d+)"             LF
-                   "request_body:\"([^\"]*)\""    LF
-                   "response_body:\"([^\"]*)\""   LF
-                   "off:(\\d+)"                   LF
-                   "disabled:(\\d+)"              LF
-                   "disabled_hosts:([^\n]*)"      LF
-                   "port:(\\d+)"                  LF
-                   "passive:(\\d+)"               LF
-                   "request_uri:([^\n]*)"         LF
-                   "request_method:([^\n]*)"      LF
-                   "request_headers:([^\n]*)"     LF
-                   "response_codes:([^\n]*)"      LF);
+        ngx_string("type:([^\n]+)"                  LF
+                   "fall:(\\d+)"                    LF
+                   "rise:(\\d+)"                    LF
+                   "timeout:(\\d+)"                 LF
+                   "interval:(\\d+)"                LF
+                   "keepalive:(\\d+)"               LF
+                   "request_body:\"([^\"]*)\""      LF
+                   "response_body:\"([^\"]*)\""     LF
+                   "off:(\\d+)"                     LF
+                   "disabled:(\\d+)"                LF
+                   "disabled_hosts:([^\n]*)"        LF
+                   "disabled_hosts_manual:([^\n]*)" LF
+                   "port:(\\d+)"                    LF
+                   "passive:(\\d+)"                 LF
+                   "request_uri:([^\n]*)"           LF
+                   "request_method:([^\n]*)"        LF
+                   "request_headers:([^\n]*)"       LF
+                   "response_codes:([^\n]*)"        LF);
 
     ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
@@ -1249,7 +1239,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     shared->disabled = ngx_atoi(content->data + capt[20], capt[21] - capt[20]);
 
     // disabled_hosts;
-    hosts.data = (ngx_str_t *) ngx_pcalloc(pool, 100 * sizeof(ngx_str_t));
+    hosts.data = (ngx_str_t*) ngx_pcalloc(pool, 100 * sizeof(ngx_str_t));
     if (hosts.data == NULL)
         goto nomem;
     hosts.reserved = 100;
@@ -1274,18 +1264,44 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
                                slab) != NGX_OK)
         goto nomem;
 
-    shared->port = ngx_atoi(content->data + capt[24], capt[25] - capt[24]);
-    shared->passive = ngx_atoi(content->data + capt[26], capt[27] - capt[26]);
+    // disabled_hosts_manual;
+    hosts.data = (ngx_str_t*) ngx_pcalloc(pool, 100 * sizeof(ngx_str_t));
+    if (hosts.data == NULL)
+        goto nomem;
+    hosts.reserved = 100;
+    hosts.len = 0;
+
+    temp_str(content->data + capt[24], capt[25] - capt[24], &temp);
+    temp.data[temp.len] = 0;
+
+    for (sep = ngx_strchr(temp.data, '|');
+         sep && hosts.len < 100;
+         sep = ngx_strchr(temp.data, '|')) {
+        ngx_str_t host;
+        host.data = temp.data;
+        host.len = (u_char *) sep - temp.data;
+        host.data[host.len] = 0;
+        hosts.data[hosts.len++] = host;
+        temp.data = (u_char *) sep + 1;
+    }
+
+    hosts.reserved = ngx_min(hosts.len * 2, hosts.reserved);
+    if (ngx_shm_str_array_copy(&shared->disabled_hosts_manual, &hosts,
+                               slab) != NGX_OK)
+        goto nomem;
+
+    shared->port = ngx_atoi(content->data + capt[26], capt[27] - capt[26]);
+    shared->passive = ngx_atoi(content->data + capt[28], capt[29] - capt[28]);
 
     if (ngx_shm_str_copy(&shared->request_uri,
-                         temp_str(content->data + capt[28],
-                                  capt[29] - capt[28], &temp),
+                         temp_str(content->data + capt[30],
+                                  capt[31] - capt[30], &temp),
                          slab) != NGX_OK)
         goto nomem;
 
     if (ngx_shm_str_copy(&shared->request_method,
-                         temp_str(content->data + capt[30],
-                                  capt[31] - capt[30], &temp),
+                         temp_str(content->data + capt[32],
+                                  capt[33] - capt[32], &temp),
                          slab) != NGX_OK)
         goto nomem;
 
@@ -1298,7 +1314,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     headers.reserved = 100;
     headers.len = 0;
 
-    temp_str(content->data + capt[32], capt[33] - capt[32], &temp);
+    temp_str(content->data + capt[34], capt[35] - capt[34], &temp);
     temp.data[temp.len] = 0;
 
     for (sep = ngx_strchr(temp.data, '|');
@@ -1329,7 +1345,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     codes.reserved = 100;
     codes.len = 0;
 
-    temp_str(content->data + capt[34], capt[35] - capt[34], &temp);
+    temp_str(content->data + capt[36], capt[37] - capt[36], &temp);
     temp.data[temp.len] = 0;
 
     for (sep = ngx_strchr(temp.data, '|');

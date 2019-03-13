@@ -606,12 +606,6 @@ ngx_dynamic_healthcheck_peer::check()
 
     ngx_time_t  *tp = ngx_timeofday();
 
-    ngx_str_array_t hosts[2] = {
-        opts->disabled_hosts_global,
-        opts->disabled_hosts
-    };
-    ngx_uint_t i, j;
-
     if (ngx_stopping()) {
 
         close();
@@ -627,29 +621,13 @@ ngx_dynamic_healthcheck_peer::check()
     if (opts->disabled)
         goto disabled;
 
-    for (i = 0; i < opts->excluded_hosts.len; i++) {
-        if (name.len >= opts->excluded_hosts.data[i].len &&
-            ngx_memcmp(name.data, opts->excluded_hosts.data[i].data,
-                       opts->excluded_hosts.data[i].len) == 0)
-            goto excluded;
-        if (server.len >= opts->excluded_hosts.data[i].len &&
-            ngx_memcmp(server.data, opts->excluded_hosts.data[i].data,
-                       opts->excluded_hosts.data[i].len) == 0)
-            goto excluded;
-    }
+    if (ngx_peer_disabled(&name, event->conf)
+        || ngx_peer_disabled(&server, event->conf))
+        goto disabled;
 
-    for (j = 0; j < 2; j++) {
-        for (i = 0; i < hosts[j].len; i++) {
-            if (name.len >= hosts[j].data[i].len &&
-                ngx_memcmp(name.data, hosts[j].data[i].data,
-                           hosts[j].data[i].len) == 0)
-                goto disabled;
-            if (server.len >= hosts[j].data[i].len &&
-                ngx_memcmp(server.data, hosts[j].data[i].data,
-                           hosts[j].data[i].len) == 0)
-                goto disabled;
-        }
-    }
+    if (ngx_peer_excluded(&name, event->conf)
+        || ngx_peer_excluded(&server, event->conf))
+        goto excluded;
 
     if (state.shared->checked + opts->interval > tp->sec)
         goto end;

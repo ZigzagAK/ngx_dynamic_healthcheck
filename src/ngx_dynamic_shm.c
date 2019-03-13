@@ -100,6 +100,7 @@ ngx_shm_num_array_create(ngx_num_array_t *src, ngx_uint_t size,
        return NGX_ERROR;
 
     src->reserved = size;
+    src->len = 0;
 
     return NGX_OK;
 }
@@ -133,6 +134,7 @@ ngx_shm_str_array_create(ngx_str_array_t *src, ngx_uint_t size,
        return NGX_ERROR;
 
     src->reserved = size;
+    src->len = 0;
 
     return NGX_OK;
 }
@@ -220,6 +222,8 @@ ngx_shm_keyval_array_create(ngx_keyval_array_t *src, ngx_uint_t size,
        return NGX_ERROR;
 
     src->reserved = size;
+    src->len = 0;
+
     return NGX_OK;
 }
 
@@ -313,6 +317,12 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
 
         ngx_rbtree_init(&sh->state.rbtree, &sh->state.sentinel,
                         ngx_str_rbtree_insert_value);
+
+        if (ngx_shm_str_array_create(&sh->disabled_hosts_manual, 10, slab)
+                == NGX_ERROR) {
+            ngx_shmtx_unlock(&slab->mutex);
+            return NGX_ERROR;
+        }
     }
 
     sh->off       = opts->off;

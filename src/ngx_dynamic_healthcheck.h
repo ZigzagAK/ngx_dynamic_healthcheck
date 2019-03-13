@@ -64,6 +64,7 @@ struct ngx_dynamic_healthcheck_opts_s {
     ngx_flag_t               off;
     ngx_str_array_t          disabled_hosts_global;
     ngx_str_array_t          disabled_hosts;
+    ngx_str_array_t          disabled_hosts_manual;
     ngx_str_array_t          excluded_hosts;
     ngx_flag_t               disabled;
     size_t                   buffer_size;
@@ -124,12 +125,34 @@ ngx_stopping()
     return ngx_exiting || ngx_terminate || ngx_quit;
 }
 
+#ifdef __cplusplus
+
+class scoped_slab_lock {
+private:
+    ngx_slab_pool_t *slab;
+
+public:
+    scoped_slab_lock(ngx_slab_pool_t *s)
+        : slab(s)
+    {
+        ngx_shmtx_lock(&slab->mutex);
+    }
+    ~scoped_slab_lock()
+    {
+        ngx_shmtx_unlock(&slab->mutex);
+    }
+};
+
+
+#define SCOPED_SLAB_LOCK(slab) scoped_slab_lock m(slab)
 
 ngx_inline ngx_flag_t
 ngx_peer_excluded(ngx_str_t *name,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
     ngx_uint_t i;
+
+    SCOPED_SLAB_LOCK(conf->peers.shared->slab);
 
     for (i = 0; i < conf->shared->excluded_hosts.len; i++) {
         if (name->len >= conf->shared->excluded_hosts.data[i].len &&
@@ -142,7 +165,31 @@ ngx_peer_excluded(ngx_str_t *name,
 }
 
 
-#ifdef __cplusplus
+ngx_inline ngx_flag_t
+ngx_peer_disabled(ngx_str_t *name,
+    ngx_dynamic_healthcheck_conf_t *conf)
+{
+    SCOPED_SLAB_LOCK(conf->peers.shared->slab);
+
+    ngx_str_array_t hosts[3] = {
+        conf->shared->disabled_hosts_global,
+        conf->shared->disabled_hosts,
+        conf->shared->disabled_hosts_manual
+    };
+    ngx_uint_t i, j;
+
+    for (j = 0; j < sizeof(hosts) / sizeof(hosts[1]); j++) {
+        for (i = 0; i < hosts[j].len; i++) {
+            if (name->len >= hosts[j].data[i].len &&
+                ngx_memcmp(name->data, hosts[j].data[i].data,
+                           hosts[j].data[i].len) == 0)
+                return 1;
+        }
+    }
+
+    return 0;
+}
+
 
 class ngx_dynamic_event_handler_base {
 
