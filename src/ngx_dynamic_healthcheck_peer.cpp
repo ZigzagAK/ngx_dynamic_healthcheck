@@ -618,17 +618,14 @@ ngx_dynamic_healthcheck_peer::check()
         goto end;
     }
 
-    if (opts->disabled)
-        goto disabled;
-
-    if (state.shared->checked + opts->interval > tp->sec)
-        goto end;
-
     if (name.len >= skip_addr.len
         && ngx_memcmp(name.data, skip_addr.data, skip_addr.len) == 0) {
         down();
         return completed();
     }
+
+    if (opts->disabled)
+        goto disabled;
 
     for (i = 0; i < opts->excluded_hosts.len; i++) {
         if (name.len >= opts->excluded_hosts.data[i].len &&
@@ -653,6 +650,9 @@ ngx_dynamic_healthcheck_peer::check()
                 goto disabled;
         }
     }
+
+    if (state.shared->checked + opts->interval > tp->sec)
+        goto end;
 
     return connect();
 
