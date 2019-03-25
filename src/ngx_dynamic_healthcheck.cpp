@@ -140,17 +140,20 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
 
             if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0)
 
-                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_tcp<PeerT>),
+                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_tcp<PeersT,
+                                                                     PeerT>),
                                   event->log);
 
             else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0)
 
-                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_http<PeerT>),
+                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_http<PeersT,
+                                                                      PeerT>),
                                   event->log);
 
             else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0)
 
-                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_ssl<PeerT>),
+                addr = ngx_calloc(sizeof(ngx_dynamic_healthcheck_ssl<PeersT,
+                                                                     PeerT>),
                                   event->log);
             else
                 goto end;
@@ -161,17 +164,20 @@ do_check_private(S *uscf, ngx_dynamic_healthcheck_event_t *event)
             if (type.len == 3 && ngx_memcmp(type.data, "tcp", 3) == 0)
 
                 p = new (addr)
-                    ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, state);
+                    ngx_dynamic_healthcheck_tcp<PeersT, PeerT>(primary, event,
+                        state);
 
             else if (type.len == 4 && ngx_memcmp(type.data, "http", 4) == 0)
 
                 p = new (addr)
-                    ngx_dynamic_healthcheck_http<PeerT>(peer, event, state);
+                    ngx_dynamic_healthcheck_http<PeersT, PeerT>(primary, event,
+                        state);
 
             else if (type.len == 3 && ngx_memcmp(type.data, "ssl", 3) == 0)
 
                 p = new (addr)
-                    ngx_dynamic_healthcheck_ssl<PeerT>(peer, event, state);
+                    ngx_dynamic_healthcheck_ssl<PeersT, PeerT>(primary, event,
+                        state);
 
             else
                 continue;

@@ -13,7 +13,6 @@ DIR="$(pwd)"
 
 VERSION="1.15.6"
 PCRE_VERSION="8.39"
-LUAJIT_VERSION="2.1.0-beta2"
 ZLIB_VERSION="1.2.11"
 
 SUFFIX=""
@@ -48,7 +47,7 @@ fi
 
 function build_luajit() {
   echo "Build luajit"
-  cd LuaJIT-$LUAJIT_VERSION
+  cd luajit2
   make -j1 > /dev/null
   r=$?
   if [ $r -ne 0 ]; then
@@ -168,15 +167,6 @@ function download_nginx() {
   fi
 }
 
-function download_luajit() {
-  if [ $download -eq 1 ] || [ ! -e LuaJIT-$LUAJIT_VERSION.tar.gz ]; then
-    echo "Download LuaJIT-$LUAJIT_VERSION"
-    curl -s -L -O http://luajit.org/download/LuaJIT-$LUAJIT_VERSION.tar.gz
-  else
-    echo "Get LuaJIT-$LUAJIT_VERSION.tar.gz"
-  fi
-}
-
 function download_pcre() {
   if [ $download -eq 1 ] || [ ! -e pcre-$PCRE_VERSION.tar.gz ]; then
     echo "Download PCRE-$PCRE_VERSION"
@@ -216,7 +206,6 @@ function download() {
 
   cd download
 
-  download_luajit
   download_pcre
   download_nginx
 
@@ -226,6 +215,7 @@ function download() {
   download_module openresty   lua-cjson                        master
   download_module ZigzagAK    ngx_dynamic_upstream             master
   download_module openresty   echo-nginx-module                tags/v0.61
+  download_module openresty   luajit2                          v2.1-agentzh
 
   download_dep http://zlib.net                                 zlib      $ZLIB_VERSION      tar.gz
 

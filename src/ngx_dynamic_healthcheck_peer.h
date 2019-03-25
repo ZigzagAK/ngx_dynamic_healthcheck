@@ -112,66 +112,100 @@ public:
 };
 
 
-template <class PeerT> class ngx_dynamic_healthcheck_peer_wrap :
+template <class PeersT, class PeerT> class ngx_dynamic_healthcheck_peer_wrap :
     public ngx_dynamic_healthcheck_peer
 {
-    PeerT   *peer;
+    PeersT  *primary;
+
+    PeerT *
+    find_peer()
+    {
+        PeersT      *peers = primary;
+        PeerT       *peer;
+        ngx_uint_t   i;
+
+        for (i = 0; peers && i < 2; peers = peers->next, i++) {
+
+            for (peer = peers->peer; peer; peer = peer->next)
+
+                if (ngx_memn2cmp(server.data, peer->server.data,
+                                 server.len, peer->server.len) == 0
+                    && ngx_memn2cmp(name.data, peer->name.data,
+                                    name.len, peer->name.len) == 0)
+                    return peer;
+        }
+
+        return NULL;
+    }
 
 protected:
 
     virtual void
     up()
     {
-        ngx_rwlock_wlock(&peer->lock);
-        if (peer->down) {
-            peer->down = 0;
-            ngx_log_error(NGX_LOG_NOTICE, event->log, 0,
-                          "[%V] %V: %V addr=%V up",
-                          &module, &upstream, &server, &name);
+        ngx_rwlock_rlock(&primary->rwlock);
+
+        PeerT  *peer = find_peer();
+
+        if (peer != NULL) {
+
+            ngx_rwlock_wlock(&peer->lock);
+
+            if (peer->down) {
+                peer->down = 0;
+                ngx_log_error(NGX_LOG_NOTICE, event->log, 0,
+                              "[%V] %V: %V addr=%V up",
+                              &module, &upstream, &server, &name);
+            }
+
+            ngx_rwlock_unlock(&peer->lock);
         }
-        ngx_rwlock_unlock(&peer->lock);
+
+        ngx_rwlock_unlock(&primary->rwlock);
     }
 
     virtual void
     down(ngx_flag_t skip = 0)
     {
-        ngx_rwlock_wlock(&peer->lock);
-        if (!peer->down) {
-            peer->down = 1;
-            if (!skip) {
-                ngx_log_error(NGX_LOG_WARN, event->log, 0,
-                              "[%V] %V: %V addr=%V down",
-                              &module, &upstream, &server, &name);
+        ngx_rwlock_rlock(&primary->rwlock);
+
+        PeerT  *peer = find_peer();
+
+        if (peer != NULL) {
+
+            ngx_rwlock_wlock(&peer->lock);
+
+            if (!peer->down) {
+                peer->down = 1;
+                if (!skip) {
+                    ngx_log_error(NGX_LOG_WARN, event->log, 0,
+                                  "[%V] %V: %V addr=%V down",
+                                  &module, &upstream, &server, &name);
+                }
             }
+
+            ngx_rwlock_unlock(&peer->lock);
         }
-        ngx_rwlock_unlock(&peer->lock);
+
+        ngx_rwlock_unlock(&primary->rwlock);
     }
 
 public:
 
-    ngx_dynamic_healthcheck_peer_wrap(PeerT *p,
+    ngx_dynamic_healthcheck_peer_wrap(PeersT *peers,
         ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
-        : ngx_dynamic_healthcheck_peer(event, s), peer(p)
+        : ngx_dynamic_healthcheck_peer(event, s), primary(peers)
     {
-        ngx_rwlock_wlock(&peer->lock);
-
-        peer->conns++;
-
         name     = s.local->name;
         server   = s.local->server;
         upstream = s.local->upstream;
         module   = s.local->module;
-
-        ngx_rwlock_unlock(&peer->lock);
 
         event->remains++;
     }
 
     virtual ~ngx_dynamic_healthcheck_peer_wrap()
     {
-        ngx_rwlock_wlock(&peer->lock);
-        peer->conns--;
-        ngx_rwlock_unlock(&peer->lock);
         event->remains--;
     }
 };

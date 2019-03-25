@@ -9,8 +9,8 @@
 #include "ngx_dynamic_healthcheck_peer.h"
 
 
-template <class PeerT> class ngx_dynamic_healthcheck_tcp :
-    public ngx_dynamic_healthcheck_peer_wrap<PeerT>
+template <class PeersT, class PeerT> class ngx_dynamic_healthcheck_tcp :
+    public ngx_dynamic_healthcheck_peer_wrap<PeersT, PeerT>
 {
 protected:
 
@@ -136,9 +136,9 @@ protected:
 
 public:
 
-    ngx_dynamic_healthcheck_tcp(PeerT *peer,
+    ngx_dynamic_healthcheck_tcp(PeersT *peers,
         ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
-        : ngx_dynamic_healthcheck_peer_wrap<PeerT>(peer, event, s)
+        : ngx_dynamic_healthcheck_peer_wrap<PeersT, PeerT>(peers, event, s)
     {
         shared = event->conf->shared;
     }

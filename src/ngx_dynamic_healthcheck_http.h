@@ -70,8 +70,8 @@ public:
 };
 
 
-template <class PeerT> class ngx_dynamic_healthcheck_http :
-    public ngx_dynamic_healthcheck_tcp<PeerT>
+template <class PeersT, class PeerT> class ngx_dynamic_healthcheck_http :
+    public ngx_dynamic_healthcheck_tcp<PeersT, PeerT>
 {
 
     healthcheck_http_helper helper;
@@ -92,7 +92,7 @@ protected:
 
 tcp:
 
-        return ngx_dynamic_healthcheck_tcp<PeerT>::on_send(state);
+        return ngx_dynamic_healthcheck_tcp<PeersT, PeerT>::on_send(state);
     }
 
     virtual ngx_int_t
@@ -103,9 +103,9 @@ tcp:
     
 public:
 
-    ngx_dynamic_healthcheck_http(PeerT *peer,
+    ngx_dynamic_healthcheck_http(PeersT *peers,
         ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
-        : ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, s),
+        : ngx_dynamic_healthcheck_tcp<PeersT, PeerT>(peers, event, s),
           helper(s)
     {}
 

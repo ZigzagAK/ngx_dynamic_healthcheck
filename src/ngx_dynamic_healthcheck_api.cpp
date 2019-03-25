@@ -7,7 +7,9 @@
 #include <assert.h>
 
 #ifdef _WITH_LUA_API
+extern "C" {
 #include "ngx_http_lua_api.h"
+}
 #endif
 
 extern ngx_str_t NGX_DH_MODULE_HTTP;
@@ -481,22 +483,6 @@ ngx_pool_num_array_create(ngx_num_array_t *src, ngx_uint_t size,
 }
 
 
-#define ngx_http_lua_req_key  "__ngx_req"
-
-
-static ngx_inline ngx_http_request_t *
-ngx_http_lua_get_req(lua_State *L)
-{
-    ngx_http_request_t    *r;
-
-    lua_getglobal(L, ngx_http_lua_req_key);
-    r = (ngx_http_request_t *) lua_touserdata(L, -1);
-    lua_pop(L, 1);
-
-    return r;
-}
-
-
 int
 ngx_dynamic_healthcheck_api_base::do_lua_update(lua_State *L,
     ngx_dynamic_healthcheck_conf_t *conf)
@@ -508,7 +494,7 @@ ngx_dynamic_healthcheck_api_base::do_lua_update(lua_State *L,
     ngx_flag_t                      flags = 0;
     ngx_str_t                       s;
 
-    r = ngx_http_lua_get_req(L);
+    r = ngx_http_lua_get_request(L);
     if (r == NULL)
         return luaL_error(L, "no request");
 

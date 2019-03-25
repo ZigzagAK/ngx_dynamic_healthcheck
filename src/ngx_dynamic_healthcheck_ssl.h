@@ -76,8 +76,8 @@ typedef struct {
 #pragma pack()
 
 
-template <class PeerT> class ngx_dynamic_healthcheck_ssl :
-    public ngx_dynamic_healthcheck_tcp<PeerT>
+template <class PeersT, class PeerT> class ngx_dynamic_healthcheck_ssl :
+    public ngx_dynamic_healthcheck_tcp<PeersT, PeerT>
 {
 protected:
 
@@ -109,7 +109,7 @@ protected:
             if (make_request(state) == NGX_ERROR)
                 return NGX_ERROR;
 
-        return ngx_dynamic_healthcheck_tcp<PeerT>::on_send(state);
+        return ngx_dynamic_healthcheck_tcp<PeersT, PeerT>::on_send(state);
     }
 
     virtual ngx_int_t
@@ -165,9 +165,9 @@ protected:
     
 public:
 
-    ngx_dynamic_healthcheck_ssl(PeerT *peer,
+    ngx_dynamic_healthcheck_ssl(PeersT *peers,
         ngx_dynamic_healthcheck_event_t *event, ngx_dynamic_hc_state_node_t s)
-        : ngx_dynamic_healthcheck_tcp<PeerT>(peer, event, s)
+        : ngx_dynamic_healthcheck_tcp<PeersT, PeerT>(peers, event, s)
     {}
 };
 
