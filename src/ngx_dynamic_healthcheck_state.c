@@ -52,7 +52,7 @@ ngx_dynamic_healthcheck_create_local(ngx_str_t *server, ngx_str_t *name,
     ngx_pool_t                   *pool;
     ngx_dynamic_hc_local_node_t  *n;
 
-    pool = ngx_create_pool(ngx_pagesize - 1, ngx_cycle->log);
+    pool = ngx_create_pool(ngx_pagesize, ngx_cycle->log);
     if (pool == NULL)
         return NULL;
 
