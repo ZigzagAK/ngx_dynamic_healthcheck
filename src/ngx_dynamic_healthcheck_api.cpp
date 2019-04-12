@@ -1191,7 +1191,7 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
 
     if (m == NGX_REGEX_NO_MATCHED) {
         ngx_log_error(NGX_LOG_ERR, log, 0, "healthcheck: failed to parse: \n%V",
-                      &content);
+                      content);
         return NGX_ERROR;
     }
 
