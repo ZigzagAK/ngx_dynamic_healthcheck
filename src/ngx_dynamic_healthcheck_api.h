@@ -212,6 +212,8 @@ public:
             return NGX_ERROR;
 
         umcf = get_upstream_conf(umcf);
+        if (umcf == NULL)
+            return NGX_ERROR;
         uscf = (S **) umcf->upstreams.elts;
 
         for (i = 0; i < umcf->upstreams.nelts; i++)
@@ -235,6 +237,8 @@ public:
             return NGX_ERROR;
 
         umcf = get_upstream_conf(umcf);
+        if (umcf == NULL)
+            return NGX_ERROR;
         uscf = (S **) umcf->upstreams.elts;
 
         for (i = 0; i < umcf->upstreams.nelts; i++) {
@@ -263,6 +267,8 @@ public:
         ngx_uint_t    updated = 0;
 
         umcf = get_upstream_conf(umcf);
+        if (umcf == NULL)
+            return NGX_ERROR;
         uscf = (S **) umcf->upstreams.elts;
 
         for (i = 0; i < umcf->upstreams.nelts; i++) {
@@ -316,6 +322,8 @@ public:
             return lua_error(L, "1 or 0 arguments expected");
 
         umcf = get_upstream_conf(umcf);
+        if (umcf == NULL)
+            return lua_error(L, "not initialized");
         uscf = (S **) umcf->upstreams.elts;
 
         if (upstream.len == 0)
@@ -380,6 +388,8 @@ public:
             return luaL_error(L, "table expected on 2nd argument");
 
         umcf = get_upstream_conf(umcf);
+        if (umcf == NULL)
+            return lua_error(L, "not initialized");
         uscf = (S **) umcf->upstreams.elts;
 
         for (i = 0; i < umcf->upstreams.nelts; i++)
@@ -489,6 +499,8 @@ public:
             return lua_error(L, "1 or 0 arguments expected");
 
         umcf = get_upstream_conf(umcf);
+        if (umcf == NULL)
+            return lua_error(L, "not initialized");
         uscf = (S **) umcf->upstreams.elts;
 
         if (upstream.len == 0)
@@ -620,6 +632,7 @@ public:
             event->uscf = (void *) uscf[i];
             event->conf = conf;
             event->completed = &ngx_dynamic_healthcheck_api<M, S>::on_completed;
+            event->updated = conf->shared->updated;
 
             conf->event.log = log;
             conf->event.data = (void *) event;
@@ -645,7 +658,7 @@ private:
         if (event->conf->config.persistent.len != 0
             && ngx_strcmp(event->conf->config.persistent.data, "off") != 0)
             ngx_dynamic_healthcheck_api_base::save(event->conf, event->log);
-        else
+        else if (event->updated == event->conf->shared->updated)
             event->conf->shared->updated = 0;
 
         ngx_shmtx_unlock(&event->conf->shared->state.slab->mutex);

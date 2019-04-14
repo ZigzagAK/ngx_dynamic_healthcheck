@@ -70,7 +70,7 @@ struct ngx_dynamic_healthcheck_opts_s {
     size_t                   buffer_size;
     ngx_msec_t               last;
     ngx_str_t                persistent;
-    ngx_flag_t               updated;
+    ngx_uint_t               updated;
     ngx_int_t                loaded;
     ngx_flag_t               passive;
     ngx_dynamic_hc_shared_t  state;
@@ -115,6 +115,7 @@ struct ngx_dynamic_healthcheck_event_s {
     ngx_log_t                                   *log;
     ngx_dynamic_healthcheck_conf_t              *conf;
     ngx_dynamic_healthcheck_event_completed_pt   completed;
+    ngx_uint_t                                   updated;
 };
 typedef struct ngx_dynamic_healthcheck_event_s ngx_dynamic_healthcheck_event_t;
 

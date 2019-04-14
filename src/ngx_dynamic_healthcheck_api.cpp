@@ -23,7 +23,7 @@ ngx_dynamic_healthcheck_api_base::do_disable
         return NGX_DECLINED;
 
     conf->shared->disabled = disable;
-    conf->shared->updated = 1;
+    conf->shared->updated++;
 
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "[%V] %V %s",
                   &conf->config.module, &conf->config.upstream,
@@ -60,7 +60,7 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
             assert(disabled_hosts->len > 0);
             disabled_hosts->len--;
 
-            conf->shared->updated = 1;
+            conf->shared->updated++;
 
             ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
                           "[%V] %V enable host: %V",
@@ -91,7 +91,7 @@ ngx_dynamic_healthcheck_api_base::do_disable_host
 
     disabled_hosts->len++;
 
-    conf->shared->updated = 1;
+    conf->shared->updated++;
 
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0,
                   "[%V] %V disable host: %V",
@@ -233,7 +233,7 @@ ngx_dynamic_healthcheck_api_base::do_update
     if (flags & NGX_DYNAMIC_UPDATE_OPT_HEADERS)
         conf->shared->request_headers = sh.request_headers;
 
-    conf->shared->updated = 1;
+    conf->shared->updated++;
 
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "[%V] %V update",
                   &conf->config.module, &conf->config.upstream);
