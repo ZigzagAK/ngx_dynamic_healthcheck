@@ -16,6 +16,8 @@ export LUA_CPATH="$DIR/install/tmp/$folder/lib/lua/5.1/?.so"
 
 ret=0
 
+#export TEST_NGINX_USE_VALGRIND=1
+
 for t in $(ls t/*.t)
 do
   echo "Tests : "$t

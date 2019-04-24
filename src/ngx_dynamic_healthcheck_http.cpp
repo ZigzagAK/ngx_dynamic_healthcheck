@@ -28,15 +28,42 @@ healthcheck_http_helper::make_request(ngx_dynamic_healthcheck_opts_t *shared,
     ngx_connection_t                *c = state->pc.connection;
     ngx_uint_t                       i;
     ngx_str_t                        host;
+    ngx_flag_t                       is_unix_socket;
+    ngx_uint_t                       keepalive = shared->keepalive;
+    static ngx_str_t                 Host = ngx_string("Host");
+
+    ngx_str_null(&host);
+
+    is_unix_socket = state->server.len > 5
+        && ngx_strncmp(state->server.data, "unix:", 5) == 0;
+    if (is_unix_socket)
+        keepalive = 1;
 
     buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
-        "%V %V HTTP/1.%s\r\n",
-        &shared->request_method,
-        &shared->request_uri,
-        shared->keepalive > c->requests + 1 ? "1" : "0");
+        "%V %V HTTP/1.%d\r\n", &shared->request_method, &shared->request_uri,
+        is_unix_socket ? 0 : 1);
 
-    if (state->server.len >= 5
-        && ngx_strncmp(state->server.data, "unix:", 5) != 0) {
+    buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+        "User-Agent: nginx/"NGINX_VERSION"\r\n"
+        "Connection: %s\r\n",
+        keepalive > c->requests + 1 ? "keep-alive" : "close");
+
+    for (i = 0; i < shared->request_headers.len; i++) {
+        if (ngx_strncasecmp(Host.data, shared->request_headers.data[i].key.data,
+                            shared->request_headers.data[i].key.len) == 0) {
+            host = shared->request_headers.data[i].value;
+            continue;
+        }
+        buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+            "%V: %V\r\n",
+            &shared->request_headers.data[i].key,
+            &shared->request_headers.data[i].value);
+    }
+
+    if (host.data != NULL) {
+        buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+            "Host: %V\r\n", &host);
+    } else if (!is_unix_socket) {
         host = state->name;
         for (; host.len > 0 && host.data[host.len - 1] != ':';
                host.len--);
@@ -44,17 +71,6 @@ healthcheck_http_helper::make_request(ngx_dynamic_healthcheck_opts_t *shared,
         buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
             "Host: %V:%d\r\n", &host, get_in_port(state->sockaddr));
     }
-
-    buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
-        "User-Agent: nginx/"NGINX_VERSION"\r\n"
-        "Connection: %s\r\n",
-        shared->keepalive > c->requests + 1 ? "keep-alive" : "close");
-
-    for (i = 0; i < shared->request_headers.len; i++)
-        buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
-            "%V: %V\r\n",
-            &shared->request_headers.data[i].key,
-            &shared->request_headers.data[i].value);
 
     if (shared->request_body.len)
         buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
