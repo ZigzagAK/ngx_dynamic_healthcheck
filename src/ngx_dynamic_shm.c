@@ -286,42 +286,116 @@ nomem:
 }
 
 
-static ngx_int_t
-ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
+typedef struct {
+    ngx_dynamic_healthcheck_opts_t  opts;
+    ngx_int_t                       count;
+    ngx_queue_t                     queue;
+} ngx_healthcehck_conf_t;
+
+
+static ngx_healthcehck_conf_t *
+ngx_shm_conf_get(ngx_str_t upstream, ngx_queue_t *sh,
+    ngx_slab_pool_t *slab)
 {
-    ngx_dynamic_healthcheck_conf_t *conf;
-    ngx_dynamic_healthcheck_opts_t *sh, *opts;
-    ngx_flag_t                      b = 1;
-    ngx_slab_pool_t                *slab;
-    
-    conf = (ngx_dynamic_healthcheck_conf_t *) zone->data;
+    ngx_queue_t             *q;
+    ngx_healthcehck_conf_t  *conf;
+
+    for (q = ngx_queue_head(sh);
+         q != ngx_queue_sentinel(sh);
+         q = ngx_queue_next(q))
+    {
+        conf = ngx_queue_data(q, ngx_healthcehck_conf_t, queue);
+        if (conf->count >= 0
+            && ngx_memn2cmp(upstream.data, conf->opts.upstream.data,
+                           upstream.len, conf->opts.upstream.len) == 0) {
+            conf->count++;
+            return conf;
+        }
+    }
+
+    conf = ngx_slab_calloc_locked(slab, sizeof(ngx_healthcehck_conf_t));
+    if (conf != NULL) {
+        ngx_queue_insert_tail(sh, &conf->queue);
+        conf->count = 1;
+        return conf;
+    }
+
+    return NULL;
+}
+
+
+static void
+ngx_shm_conf_gc(ngx_queue_t *sh, ngx_slab_pool_t *slab)
+{
+    ngx_queue_t             *q;
+    ngx_healthcehck_conf_t  *conf;
+
+again:
+
+    for (q = ngx_queue_head(sh);
+         q != ngx_queue_sentinel(sh);
+         q = ngx_queue_next(q))
+    {
+        conf = ngx_queue_data(q, ngx_healthcehck_conf_t, queue);
+        if (conf->count > -4)
+            continue;
+
+        // delayed cleanup
+
+        ngx_queue_remove(q);
+
+        ngx_shm_str_free(&conf->opts.upstream, slab);
+        ngx_shm_str_free(&conf->opts.module, slab);
+        ngx_shm_str_free(&conf->opts.type, slab);
+        ngx_shm_str_free(&conf->opts.request_uri, slab);
+        ngx_shm_str_free(&conf->opts.request_method, slab);
+        ngx_shm_str_free(&conf->opts.request_body, slab);
+        ngx_shm_str_free(&conf->opts.response_body, slab);
+        ngx_shm_num_array_free(&conf->opts.response_codes, slab);
+        ngx_shm_keyval_array_free(&conf->opts.request_headers, slab);
+        ngx_shm_str_array_free(&conf->opts.disabled_hosts, slab);
+        ngx_shm_str_array_free(&conf->opts.disabled_hosts_manual, slab);
+        ngx_shm_str_array_free(&conf->opts.excluded_hosts, slab);
+        ngx_shm_str_array_free(&conf->opts.disabled_hosts_global, slab);
+
+        ngx_dynamic_healthcheck_state_free(&conf->opts.state);
+
+        ngx_slab_free_locked(slab, conf);
+
+        goto again;
+    }
+
+    for (q = ngx_queue_head(sh);
+         q != ngx_queue_sentinel(sh);
+         q = ngx_queue_next(q))
+    {
+        conf = ngx_queue_data(q, ngx_healthcehck_conf_t, queue);
+        conf->count--;
+    }
+}
+
+
+static ngx_int_t
+ngx_shm_conf_init(ngx_dynamic_healthcheck_conf_t *conf,
+    ngx_dynamic_healthcheck_opts_t *sh, ngx_shm_zone_t *zone)
+{
+    ngx_dynamic_healthcheck_opts_t  *opts;
+    ngx_slab_pool_t                 *slab;
+    ngx_flag_t                       b = 1;
+
+    slab = (ngx_slab_pool_t *) zone->shm.addr;
+
     opts = &conf->config;
 
     conf->zone = zone;
-    slab = (ngx_slab_pool_t *) zone->shm.addr;
 
-    ngx_shmtx_lock(&slab->mutex);
-    
-    if (old != NULL) {
-        sh = (ngx_dynamic_healthcheck_opts_t *) slab->data;
-    } else {
-        sh = ngx_slab_calloc_locked(slab,
-            sizeof(ngx_dynamic_healthcheck_opts_t));
-        if (sh == NULL) {
-            ngx_shmtx_unlock(&slab->mutex);
-            return NGX_ERROR;
-        }
-
-        slab->data = sh;
-
+    if (sh->upstream.data == NULL) {
         ngx_rbtree_init(&sh->state.rbtree, &sh->state.sentinel,
                         ngx_str_rbtree_insert_value);
 
         if (ngx_shm_str_array_create(&sh->disabled_hosts_manual, 10, slab)
-                == NGX_ERROR) {
-            ngx_shmtx_unlock(&slab->mutex);
+                == NGX_ERROR)
             return NGX_ERROR;
-        }
 
         b = NGX_OK == ngx_shm_str_copy(&sh->upstream, &opts->upstream, slab);
         b = b && NGX_OK == ngx_shm_str_copy(&sh->module, &opts->module, slab);
@@ -386,35 +460,75 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
 
     sh->updated = 1;
 
-    ngx_shmtx_unlock(&slab->mutex);
-
     if (!b)
         return NGX_ERROR;
-
-    conf->shared = sh;
-
-    if (old != NULL)
-        conf->post_init(conf);
 
     return NGX_OK;
 }
 
 
-ngx_shm_zone_t *
-ngx_add_shm_zone(ngx_conf_t *cf, const u_char *mod,
-    ngx_str_t *upstream, void *tag)
+static ngx_int_t
+ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
 {
-    ngx_str_t name;
+    ngx_array_t                     *pconf;
+    ngx_dynamic_healthcheck_conf_t  *conf;
+    ngx_healthcehck_conf_t          *sh;
+    ngx_queue_t                     *qsh;
+    ngx_slab_pool_t                 *slab;
+    ngx_uint_t                       j;
 
-    name.len = ngx_strlen(mod) + upstream->len + 1;
-    name.data = ngx_pcalloc(cf->pool, name.len + 1);
+    pconf = zone->data;
+    slab = (ngx_slab_pool_t *) zone->shm.addr;
 
-    if (name.data == NULL)
-        return NULL;
+    ngx_shmtx_lock(&slab->mutex);
 
-    ngx_snprintf(name.data, name.len + 1, "%s:%V", mod, upstream);
+    if (old) {
+        qsh = slab->data;
+    } else {
+        qsh = ngx_slab_calloc_locked(slab, sizeof(ngx_queue_t));
+        if (qsh == NULL) {
+            ngx_shmtx_unlock(&slab->mutex);
+            return NGX_ERROR;
+        }
+        ngx_queue_init(qsh);
+        slab->data = qsh;
+    }
 
-    return ngx_shared_memory_add(cf, &name,  262144, tag);
+    for (j = 0; j < pconf->nelts; j++) {
+
+        conf = ((ngx_dynamic_healthcheck_conf_t **) pconf->elts)[j];
+
+        sh = ngx_shm_conf_get(conf->config.upstream, qsh, slab);
+        if (sh->opts.upstream.data == NULL)
+            conf->post_init = NULL;
+
+        if (ngx_shm_conf_init(conf, &sh->opts, zone) == NGX_ERROR) {
+            ngx_shmtx_unlock(&slab->mutex);
+            return NGX_ERROR;
+        }
+
+        conf->shared = &sh->opts;
+    }
+
+    ngx_shm_conf_gc(qsh, slab);
+
+    ngx_shmtx_unlock(&slab->mutex);
+
+    for (j = 0; j < pconf->nelts; j++) {
+
+        conf = ((ngx_dynamic_healthcheck_conf_t **) pconf->elts)[j];
+        if (conf->post_init)
+            conf->post_init(conf);
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_shm_zone_t *
+ngx_add_shm_zone(ngx_conf_t *cf, ngx_str_t mod, size_t size, void *tag)
+{
+    return ngx_shared_memory_add(cf, &mod, size, tag);
 }
 
 
@@ -422,17 +536,33 @@ ngx_shm_zone_t *
 ngx_shm_create_zone(ngx_conf_t *cf, ngx_dynamic_healthcheck_conf_t *conf,
     void *tag)
 {
-    ngx_shm_zone_t *zone;
+    ngx_shm_zone_t                   *zone;
+    ngx_array_t                      *a;
+    ngx_dynamic_healthcheck_conf_t  **pconf;
 
-    zone = ngx_add_shm_zone(cf, conf->config.module.data,
-                            &conf->config.upstream, tag);
-
+    zone = ngx_add_shm_zone(cf, conf->config.module, conf->zone_size, tag);
     if (zone == NULL)
         return NULL;
 
     zone->init = ngx_init_shm_zone;
     zone->noreuse = 0;
-    zone->data = (void *) conf;
+
+    if (zone->data == NULL) {
+        a = ngx_array_create(cf->pool, 10, sizeof(void *));
+        if (a == NULL)
+            return NULL;
+        zone->data = a;
+    } else
+        a = zone->data;
+
+    if (conf->zone_size != 0)
+        return zone;
+
+    pconf = ngx_array_push(a);
+    if (pconf == NULL)
+        return NULL;
+
+    *pconf = conf;
 
     return zone;
 }

@@ -112,6 +112,7 @@ struct ngx_dynamic_healthcheck_conf_s {
     ngx_shm_zone_t                  *zone;
     ngx_shm_zone_post_init_pt        post_init;
     void                            *uscf;
+    size_t                           zone_size;
 };
 typedef struct ngx_dynamic_healthcheck_conf_s ngx_dynamic_healthcheck_conf_t;
 

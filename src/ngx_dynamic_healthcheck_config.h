@@ -55,5 +55,10 @@ ngx_http_dynamic_healthcheck_check_response_codes(ngx_conf_t *cf,
         }                                                                    \
     }
 
+#ifdef __cplusplus
+#undef NGX_CONF_ERROR
+#define NGX_CONF_ERROR (char *) -1
+#endif
+
 #endif /* CONFIG_H */
 

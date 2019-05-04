@@ -293,6 +293,33 @@ again:
 }
 
 
+void
+ngx_dynamic_healthcheck_state_free(ngx_dynamic_hc_shared_t *state)
+{
+    ngx_dynamic_hc_shared_node_t  *shared;
+    ngx_rbtree_node_t             *node, *root, *sentinel;
+    ngx_slab_pool_t               *slab = state->slab;
+
+    sentinel = state->rbtree.sentinel;
+    root = state->rbtree.root;
+
+    if (root == sentinel)
+        return;
+
+    for (node = ngx_rbtree_min(root, sentinel);
+         node;)
+    {
+        shared = (ngx_dynamic_hc_shared_node_t *) node;
+
+        node = ngx_rbtree_next(&state->rbtree, node);
+
+        ngx_slab_free_locked(slab, shared->key.str.data);
+
+        ngx_slab_free_locked(slab, shared);
+    }
+}
+
+
 static void
 traverse_tree(ngx_rbtree_node_t *node,
     ngx_rbtree_node_t *sentinel, ngx_str_t *name)

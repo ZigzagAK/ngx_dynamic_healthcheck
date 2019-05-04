@@ -42,6 +42,7 @@ function build_debug() {
   cd nginx-$VERSION$SUFFIX
   echo "Configuring debug nginx-$VERSION$SUFFIX"
   ./configure --prefix="$INSTALL_PREFIX/nginx-$VERSION$SUFFIX" \
+              --with-threads \
               $EMBEDDED_OPTS \
               --with-stream \
               --with-debug \

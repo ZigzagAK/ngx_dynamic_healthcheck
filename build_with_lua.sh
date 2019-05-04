@@ -72,6 +72,7 @@ function build_debug() {
   cd nginx-$VERSION$SUFFIX
   echo "Configuring debug nginx-$VERSION$SUFFIX"
   ./configure --prefix="$INSTALL_PREFIX/nginx-$VERSION$SUFFIX" \
+              --with-threads \
               $EMBEDDED_OPTS \
               --with-stream \
               --with-debug \
@@ -107,6 +108,7 @@ function build_release() {
   echo "Configuring release nginx-$VERSION$SUFFIX"
   ./configure --prefix="$INSTALL_PREFIX/nginx-$VERSION$SUFFIX" \
               $EMBEDDED_OPTS \
+              --with-threads \
               --with-cc-opt="-D_WITH_LUA_API" \
               --with-stream \
               --add-module=../echo-nginx-module \

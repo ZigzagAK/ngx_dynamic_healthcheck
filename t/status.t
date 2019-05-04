@@ -459,7 +459,7 @@ u1 127.0.0.1:6000 0
     server {
       listen 6001;
       content_by_lua_block {
-        ngx.sleep(1)
+        ngx.sleep(0.5)
       }
     }
 --- stream_server_config

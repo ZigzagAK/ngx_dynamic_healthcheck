@@ -31,6 +31,13 @@ static ngx_command_t ngx_stream_dynamic_healthcheck_commands[] = {
       0,
       NULL },
 
+    { ngx_string("healthcheck_zone"),
+      NGX_STREAM_MAIN_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_size_slot,
+      NGX_STREAM_MAIN_CONF_OFFSET,
+      offsetof(ngx_dynamic_healthcheck_conf_t, zone_size),
+      NULL },
+
     { ngx_string("healthcheck_buffer_size"),
       NGX_STREAM_MAIN_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
@@ -253,6 +260,8 @@ ngx_stream_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
     conf->config.keepalive   = NGX_CONF_UNSET_UINT;
     conf->config.buffer_size = NGX_CONF_UNSET_SIZE;
 
+    conf->zone_size = NGX_CONF_UNSET_SIZE;
+
     return conf;
 }
 
@@ -369,6 +378,7 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
     }
 
     conf->uscf = uscf;
+    conf->zone_size = 0;
     conf->post_init = ngx_stream_dynamic_healthcheck_init_peers;
     conf->zone = ngx_shm_create_zone(cf, conf,
         &ngx_stream_dynamic_healthcheck_module);
@@ -385,6 +395,16 @@ ngx_stream_dynamic_healthcheck_init_main_conf(ngx_conf_t *cf, void *conf)
 {
     ngx_stream_upstream_srv_conf_t     **b, **e;
     ngx_stream_upstream_main_conf_t     *umcf;
+    ngx_dynamic_healthcheck_conf_t      *hmcf;
+
+    hmcf = (ngx_dynamic_healthcheck_conf_t *) conf;
+
+    ngx_conf_init_size_value(hmcf->zone_size, 64 * 1024 * 1024);
+
+    hmcf->zone = ngx_shm_create_zone(cf, hmcf,
+        &ngx_stream_dynamic_healthcheck_module);
+    if (hmcf->zone == NULL)
+        return NGX_CONF_ERROR;
 
     umcf = (ngx_stream_upstream_main_conf_t *)
         ngx_stream_conf_get_module_main_conf(cf, ngx_stream_upstream_module);
@@ -394,7 +414,7 @@ ngx_stream_dynamic_healthcheck_init_main_conf(ngx_conf_t *cf, void *conf)
 
     for (; b < e; ++b)
         if (ngx_stream_dynamic_healthcheck_init_srv_conf(cf, *b) != NGX_OK)
-            return (char *) NGX_CONF_ERROR;
+            return NGX_CONF_ERROR;
 
     ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
                   "stream dynamic healthcheck module loaded");

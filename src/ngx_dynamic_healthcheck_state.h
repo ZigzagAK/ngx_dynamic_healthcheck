@@ -110,6 +110,8 @@ void
 ngx_dynamic_healthcheck_state_checked(ngx_dynamic_hc_state_t *state,
     ngx_str_t *name);
 
+void
+ngx_dynamic_healthcheck_state_free(ngx_dynamic_hc_shared_t *state);
 
 #ifdef __cplusplus
 }
