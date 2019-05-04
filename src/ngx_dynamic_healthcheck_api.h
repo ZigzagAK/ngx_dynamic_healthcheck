@@ -26,24 +26,6 @@ extern "C" {
 #include "ngx_dynamic_shm.h"
 
 
-#define NGX_DYNAMIC_UPDATE_OPT_TYPE                1
-#define NGX_DYNAMIC_UPDATE_OPT_FALL                2
-#define NGX_DYNAMIC_UPDATE_OPT_RISE                4
-#define NGX_DYNAMIC_UPDATE_OPT_TIMEOUT             8
-#define NGX_DYNAMIC_UPDATE_OPT_INTERVAL           16
-#define NGX_DYNAMIC_UPDATE_OPT_KEEPALIVE          32
-#define NGX_DYNAMIC_UPDATE_OPT_URI                64
-#define NGX_DYNAMIC_UPDATE_OPT_METHOD            128
-#define NGX_DYNAMIC_UPDATE_OPT_HEADERS           256
-#define NGX_DYNAMIC_UPDATE_OPT_BODY              512
-#define NGX_DYNAMIC_UPDATE_OPT_RESPONSE_CODES   1024
-#define NGX_DYNAMIC_UPDATE_OPT_RESPONSE_BODY    2048
-#define NGX_DYNAMIC_UPDATE_OPT_OFF              4096
-#define NGX_DYNAMIC_UPDATE_OPT_DISABLED         8192
-#define NGX_DYNAMIC_UPDATE_OPT_PORT            16384
-#define NGX_DYNAMIC_UPDATE_OPT_PASSIVE         32768
-
-
 ngx_inline ngx_flag_t str_eq(ngx_str_t s1, ngx_str_t s2)
 {
     return ngx_memn2cmp(s1.data, s2.data, s1.len, s2.len) == 0;

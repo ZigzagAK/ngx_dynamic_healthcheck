@@ -21,6 +21,23 @@ extern "C" {
 
 #include "ngx_dynamic_healthcheck_state.h"
 
+#define NGX_DYNAMIC_UPDATE_OPT_TYPE                1
+#define NGX_DYNAMIC_UPDATE_OPT_FALL                2
+#define NGX_DYNAMIC_UPDATE_OPT_RISE                4
+#define NGX_DYNAMIC_UPDATE_OPT_TIMEOUT             8
+#define NGX_DYNAMIC_UPDATE_OPT_INTERVAL           16
+#define NGX_DYNAMIC_UPDATE_OPT_KEEPALIVE          32
+#define NGX_DYNAMIC_UPDATE_OPT_URI                64
+#define NGX_DYNAMIC_UPDATE_OPT_METHOD            128
+#define NGX_DYNAMIC_UPDATE_OPT_HEADERS           256
+#define NGX_DYNAMIC_UPDATE_OPT_BODY              512
+#define NGX_DYNAMIC_UPDATE_OPT_RESPONSE_CODES   1024
+#define NGX_DYNAMIC_UPDATE_OPT_RESPONSE_BODY    2048
+#define NGX_DYNAMIC_UPDATE_OPT_OFF              4096
+#define NGX_DYNAMIC_UPDATE_OPT_DISABLED         8192
+#define NGX_DYNAMIC_UPDATE_OPT_PORT            16384
+#define NGX_DYNAMIC_UPDATE_OPT_PASSIVE         32768
+
 struct ngx_str_array_s {
     ngx_str_t   *data;
     ngx_uint_t   len;
@@ -74,6 +91,7 @@ struct ngx_dynamic_healthcheck_opts_s {
     ngx_int_t                loaded;
     ngx_flag_t               passive;
     ngx_dynamic_hc_shared_t  state;
+    ngx_flag_t               flags;
 };
 typedef struct ngx_dynamic_healthcheck_opts_s
 ngx_dynamic_healthcheck_opts_t;

@@ -24,6 +24,7 @@ ngx_dynamic_healthcheck_api_base::do_disable
 
     conf->shared->disabled = disable;
     conf->shared->updated++;
+    conf->shared->flags |= NGX_DYNAMIC_UPDATE_OPT_DISABLED;
 
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "[%V] %V %s",
                   &conf->config.module, &conf->config.upstream,
@@ -234,6 +235,7 @@ ngx_dynamic_healthcheck_api_base::do_update
         conf->shared->request_headers = sh.request_headers;
 
     conf->shared->updated++;
+    conf->shared->flags |= flags;
 
     ngx_log_error(NGX_LOG_NOTICE, ngx_cycle->log, 0, "[%V] %V update",
                   &conf->config.module, &conf->config.upstream);

@@ -21,6 +21,11 @@ ret=0
 for t in $(ls t/*.t)
 do
   echo "Tests : "$t
+  if [[ $t =~ "hup" ]]; then
+    export TEST_NGINX_USE_HUP=1
+  else
+    export TEST_NGINX_USE_HUP=0
+  fi
   prove $t
   if [ $? -ne 0 ]; then
     ret=$?

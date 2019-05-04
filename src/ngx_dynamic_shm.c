@@ -3,6 +3,7 @@
  */
 
 #include "ngx_dynamic_shm.h"
+#include "ngx_dynamic_healthcheck.h"
 
 
 static void
@@ -303,8 +304,6 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
     
     if (old != NULL) {
         sh = (ngx_dynamic_healthcheck_opts_t *) slab->data;
-        if (opts->persistent.len != 0)
-            goto skip;
     } else {
         sh = ngx_slab_calloc_locked(slab,
             sizeof(ngx_dynamic_healthcheck_opts_t));
@@ -323,39 +322,54 @@ ngx_init_shm_zone(ngx_shm_zone_t *zone, void *old)
             ngx_shmtx_unlock(&slab->mutex);
             return NGX_ERROR;
         }
+
+        b = NGX_OK == ngx_shm_str_copy(&sh->upstream, &opts->upstream, slab);
+        b = b && NGX_OK == ngx_shm_str_copy(&sh->module, &opts->module, slab);
     }
 
-    sh->off       = opts->off;
-    sh->disabled  = opts->disabled;
-    sh->fall      = opts->fall;
-    sh->rise      = opts->rise;
-    sh->timeout   = opts->timeout;
-    sh->interval  = opts->interval;
-    sh->keepalive = opts->keepalive;
-    sh->port      = opts->port;
-    sh->passive   = opts->passive;
-    sh->updated   = 1;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_OFF))
+        sh->off = opts->off;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_DISABLED))
+        sh->disabled = opts->disabled;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_FALL))
+        sh->fall = opts->fall;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_RISE))
+        sh->rise = opts->rise;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_TIMEOUT))
+        sh->timeout = opts->timeout;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_INTERVAL))
+        sh->interval = opts->interval;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_KEEPALIVE))
+        sh->keepalive = opts->keepalive;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_PORT))
+        sh->port = opts->port;
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_PASSIVE))
+        sh->passive = opts->passive;
 
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->module, &opts->module, slab);
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->upstream, &opts->upstream, slab);
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->type, &opts->type, slab);
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->request_uri, &opts->request_uri,
-                                        slab);
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->request_method,
-                                        &opts->request_method, slab);
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->request_body, &opts->request_body,
-                                        slab);
-    b = b && NGX_OK == ngx_shm_str_copy(&sh->response_body,
-                                        &opts->response_body, slab);
-    b = b && NGX_OK == ngx_shm_num_array_copy(&sh->response_codes,
-                                              &opts->response_codes, slab);
-    b = b && NGX_OK == ngx_shm_keyval_array_copy(&sh->request_headers,
-                                                 &opts->request_headers, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_TYPE))
+        b = b && NGX_OK == ngx_shm_str_copy(&sh->type, &opts->type, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_URI))
+        b = b && NGX_OK == ngx_shm_str_copy(&sh->request_uri,
+                                            &opts->request_uri, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_METHOD))
+        b = b && NGX_OK == ngx_shm_str_copy(&sh->request_method,
+                                            &opts->request_method, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_BODY))
+        b = b && NGX_OK == ngx_shm_str_copy(&sh->request_body,
+                                            &opts->request_body, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_RESPONSE_BODY))
+        b = b && NGX_OK == ngx_shm_str_copy(&sh->response_body,
+                                            &opts->response_body, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_RESPONSE_CODES))
+        b = b && NGX_OK == ngx_shm_num_array_copy(&sh->response_codes,
+                                                  &opts->response_codes, slab);
+    if (!(sh->flags & NGX_DYNAMIC_UPDATE_OPT_HEADERS))
+        b = b && NGX_OK == ngx_shm_keyval_array_copy(&sh->request_headers,
+                                                     &opts->request_headers,
+                                                     slab);
+
     b = b && NGX_OK == ngx_shm_str_array_copy(&sh->disabled_hosts,
                                               &opts->disabled_hosts, slab);
-
-skip:
-
     b = b && NGX_OK == ngx_shm_str_array_copy(&sh->excluded_hosts,
                                               &opts->excluded_hosts, slab);
     b = b && NGX_OK == ngx_shm_str_array_copy(&sh->disabled_hosts_global,
@@ -369,6 +383,8 @@ skip:
 
     sh->state.slab = slab;
     sh->buffer_size = opts->buffer_size;
+
+    sh->updated = 1;
 
     ngx_shmtx_unlock(&slab->mutex);
 
