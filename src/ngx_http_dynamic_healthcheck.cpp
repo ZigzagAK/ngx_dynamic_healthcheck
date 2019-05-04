@@ -415,7 +415,7 @@ ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
             ngx_http_dynamic_healthcheck_module);
 
     if (main_conf->config.buffer_size == NGX_CONF_UNSET_SIZE)
-        main_conf->config.buffer_size = ngx_pagesize - sizeof(ngx_pool_t) - 1;
+        main_conf->config.buffer_size = ngx_pagesize;
 
     conf = (ngx_dynamic_healthcheck_conf_t *)
         ngx_http_conf_upstream_srv_conf(uscf,
