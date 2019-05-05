@@ -792,6 +792,9 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
         if (conf == NULL)
             continue;
 
+        if (conf->shared == NULL)
+            continue;
+        
         if (conf->shared->type.len == 0)
             continue;
 
@@ -1316,6 +1319,9 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
 
         conf = ngx_dynamic_healthcheck_api_base::get_srv_conf(uscf[i]);
         if (conf == NULL)
+            continue;
+
+        if (conf->shared == NULL)
             continue;
 
         if (conf->shared->type.len == 0)
