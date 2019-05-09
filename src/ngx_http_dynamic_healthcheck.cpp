@@ -51,7 +51,7 @@ static ngx_command_t ngx_http_dynamic_healthcheck_commands[] = {
     { ngx_string("healthcheck_request_uri"),
       NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
       ngx_http_dynamic_healthcheck_check_request_uri,
-      NGX_HTTP_SRV_CONF_OFFSET,
+      NGX_HTTP_MAIN_CONF_OFFSET,
       0,
       NULL },
 
