@@ -242,6 +242,8 @@ ngx_stream_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
     conf->config.disabled_hosts_global.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
     conf->config.disabled_hosts.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
     conf->config.excluded_hosts.data = (ngx_str_t *) NGX_CONF_UNSET_PTR;
+    conf->config.response_codes.data = (ngx_int_t *) NGX_CONF_UNSET_PTR;
+    conf->config.request_headers.data = (ngx_keyval_t *) NGX_CONF_UNSET_PTR;
 
     conf->config.module      = NGX_DH_MODULE_STREAM;
     conf->config.fall        = 1;
