@@ -567,6 +567,40 @@ ngx_shm_create_zone(ngx_conf_t *cf, ngx_dynamic_healthcheck_conf_t *conf,
     return zone;
 }
 
+
+ngx_int_t
+ngx_shm_add_to_zone(ngx_dynamic_healthcheck_conf_t *conf, ngx_shm_zone_t *zone)
+{
+    ngx_queue_t             *qsh;
+    ngx_healthcehck_conf_t  *sh;
+    ngx_slab_pool_t         *slab;
+
+    slab = (ngx_slab_pool_t *) zone->shm.addr;
+    qsh = slab->data;
+
+    ngx_shmtx_lock(&slab->mutex);
+
+    sh = ngx_shm_conf_get(conf->config.upstream, qsh, slab);
+    if (sh->opts.upstream.data == NULL)
+        conf->post_init = NULL;
+
+    if (ngx_shm_conf_init(conf, &sh->opts, zone) == NGX_ERROR) {
+        ngx_shmtx_unlock(&slab->mutex);
+        return NGX_ERROR;
+    }
+
+    conf->shared = &sh->opts;
+    conf->zone = zone;
+
+    ngx_shmtx_unlock(&slab->mutex);
+
+    if (conf->post_init != NULL)
+        conf->post_init(conf);
+
+    return NGX_OK;
+}
+
+
 #ifdef _WITH_LUA_API
 
 ngx_int_t

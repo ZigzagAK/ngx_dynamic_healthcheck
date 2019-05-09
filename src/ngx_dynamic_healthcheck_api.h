@@ -555,22 +555,21 @@ public:
         tp = ngx_timeofday();
 
         now = tp->sec * 1000 + tp->msec;
-        
+
         for (i = 0; i < umcf->upstreams.nelts; i++) {
 
-            if (ngx_process == NGX_PROCESS_WORKER
-                && i % ccf->worker_processes != ngx_worker)
-                continue;
-
-            if (uscf[i]->shm_zone == NULL)
+            if (uscf[i]->srv_conf == NULL || uscf[i]->shm_zone == NULL)
                 continue;
 
             conf = get_srv_conf(uscf[i]);
-
             if (conf == NULL)
                 continue;
 
-            if (conf->shared == NULL)
+            if (conf->cycle_init_conf(uscf[i]) == NGX_ERROR)
+                continue;
+
+            if (ngx_process == NGX_PROCESS_WORKER
+                && i % ccf->worker_processes != ngx_worker)
                 continue;
 
             ngx_shmtx_lock(&conf->shared->state.slab->mutex);

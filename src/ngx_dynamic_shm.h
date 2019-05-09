@@ -68,6 +68,11 @@ ngx_shm_zone_t *
 ngx_shm_create_zone(ngx_conf_t *cf, ngx_dynamic_healthcheck_conf_t *conf,
     void *tag);
 
+ngx_int_t
+ngx_shm_add_to_zone(ngx_dynamic_healthcheck_conf_t *conf, ngx_shm_zone_t *zone);
+
+#define NGX_CONF_UNSET_ZONE ((ngx_shm_zone_t *) NGX_CONF_UNSET_PTR)
+
 #ifdef _WITH_LUA_API
 
 ngx_int_t

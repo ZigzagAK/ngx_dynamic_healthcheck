@@ -345,6 +345,10 @@ ngx_http_dynamic_healthcheck_post_conf(ngx_conf_t *cf)
 }
 
 
+static ngx_int_t
+ngx_http_dynamic_healthcheck_cycle_init_srv_conf(void *uscfp);
+
+
 static void *
 ngx_http_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
 {
@@ -370,6 +374,8 @@ ngx_http_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
     conf->config.buffer_size = NGX_CONF_UNSET_SIZE;
 
     conf->zone_size = NGX_CONF_UNSET_SIZE;
+
+    conf->cycle_init_conf = ngx_http_dynamic_healthcheck_cycle_init_srv_conf;
 
     return conf;
 }
@@ -411,33 +417,37 @@ ngx_http_dynamic_healthcheck_init_peers(ngx_dynamic_healthcheck_conf_t *conf)
 }
 
 
-static ngx_int_t
-ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
+static ngx_dynamic_healthcheck_conf_t *
+ngx_http_dynamic_healthcheck_init_srv_conf(ngx_cycle_t *cycle,
     ngx_http_upstream_srv_conf_t *uscf)
 {
     ngx_dynamic_healthcheck_conf_t *conf;
     ngx_dynamic_healthcheck_conf_t *main_conf;
 
-    if (uscf->srv_conf == NULL)
-        return NGX_OK;
+    conf = (ngx_dynamic_healthcheck_conf_t *)
+        ngx_http_conf_upstream_srv_conf(uscf,
+            ngx_http_dynamic_healthcheck_module);
+
+    if (conf->zone == NGX_CONF_UNSET_ZONE)
+        return NULL;
+
+    if (conf->zone != NULL)
+        return conf;
 
     main_conf = (ngx_dynamic_healthcheck_conf_t *)
-        ngx_http_conf_get_module_main_conf(cf,
+        ngx_http_cycle_get_module_main_conf(cycle,
             ngx_http_dynamic_healthcheck_module);
 
     if (main_conf->config.buffer_size == NGX_CONF_UNSET_SIZE)
         main_conf->config.buffer_size = ngx_pagesize;
 
-    conf = (ngx_dynamic_healthcheck_conf_t *)
-        ngx_http_conf_upstream_srv_conf(uscf,
-            ngx_http_dynamic_healthcheck_module);
-
     if (conf->config.type.len != 0 && uscf->shm_zone == NULL) {
-        ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+        ngx_log_error(NGX_LOG_ERR, cycle->log, 0,
             "'check' directive requires "
             "'zone' directive in upstream %V in %s:%ud",
             &uscf->host, uscf->file_name, uscf->line);
-        return NGX_ERROR;
+        conf->zone = NGX_CONF_UNSET_ZONE;
+        return NULL;
     }
 
     ngx_conf_merge_str_value(conf->config.type, main_conf->config.type);
@@ -491,14 +501,63 @@ ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
     conf->config.upstream = uscf->host;
 
     if (conf->config.buffer_size < conf->config.request_body.len) {
-        ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
-            "'healthcheck_buffer_size' is lesser than 'request_body'");
-        return NGX_ERROR;
+        ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0,
+            "'healthcheck_buffer_size' is lesser than 'request_body'"
+            " in upstream %V in %s:%ud",
+            &uscf->host, uscf->file_name, uscf->line);
+        conf->zone = NGX_CONF_UNSET_ZONE;
+        return NULL;
     }
 
     conf->uscf = uscf;
     conf->zone_size = 0;
     conf->post_init = ngx_http_dynamic_healthcheck_init_peers;
+
+    return conf;
+}
+
+
+static ngx_int_t
+ngx_http_dynamic_healthcheck_cycle_init_srv_conf(void *uscfp)
+{
+    ngx_http_upstream_srv_conf_t    *uscf;
+    ngx_dynamic_healthcheck_conf_t  *conf, *main_conf;
+    ngx_cycle_t                     *cycle = (ngx_cycle_t *) ngx_cycle;
+
+    uscf = (ngx_http_upstream_srv_conf_t *) uscfp;
+    if (uscf->srv_conf == NULL)
+        return NGX_DECLINED;
+
+    conf = ngx_http_dynamic_healthcheck_init_srv_conf(cycle, uscf);
+    if (conf == NULL)
+        return NGX_ERROR;
+
+    if (conf->zone != NULL || conf->zone == NGX_CONF_UNSET_PTR)
+        return NGX_DECLINED;
+
+    main_conf = (ngx_dynamic_healthcheck_conf_t *)
+            ngx_http_cycle_get_module_main_conf(cycle,
+                ngx_http_dynamic_healthcheck_module);
+
+    if (ngx_shm_add_to_zone(conf, main_conf->zone) == NGX_ERROR) {
+        conf->zone = NGX_CONF_UNSET_ZONE;
+        return NGX_ERROR;
+    }
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_http_dynamic_healthcheck_conf_init_srv_conf(ngx_conf_t *cf,
+    ngx_http_upstream_srv_conf_t *uscf)
+{
+    ngx_dynamic_healthcheck_conf_t  *conf;
+
+    conf = ngx_http_dynamic_healthcheck_init_srv_conf(cf->cycle, uscf);
+    if (conf == NULL)
+        return NGX_ERROR;
+
     conf->zone = ngx_shm_create_zone(cf, conf,
         &ngx_http_dynamic_healthcheck_module);
 
@@ -532,11 +591,11 @@ ngx_http_dynamic_healthcheck_init_main_conf(ngx_conf_t *cf, void *conf)
     e = b + umcf->upstreams.nelts;
 
     for (; b < e; ++b)
-        if (ngx_http_dynamic_healthcheck_init_srv_conf(cf, *b) != NGX_OK)
+        if (ngx_http_dynamic_healthcheck_conf_init_srv_conf(cf, *b) != NGX_OK)
             return NGX_CONF_ERROR;
 
-    ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
-                  "http dynamic healthcheck module loaded");
+    ngx_conf_log_error(NGX_LOG_NOTICE, cf, 0,
+                       "http dynamic healthcheck module loaded");
 
     return NGX_CONF_OK;
 }
