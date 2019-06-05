@@ -439,7 +439,7 @@ ngx_http_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
     ngx_conf_merge_value(conf->config.timeout,
         main_conf->config.timeout, 1000);
     ngx_conf_merge_value(conf->config.interval,
-        main_conf->config.interval, 10000);
+        main_conf->config.interval, 10);
     ngx_conf_merge_uint_value(conf->config.keepalive,
         main_conf->config.keepalive, 1);
     ngx_conf_merge_value(conf->config.passive,
