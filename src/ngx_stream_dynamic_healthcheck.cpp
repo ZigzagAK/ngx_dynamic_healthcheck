@@ -354,7 +354,7 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_cycle_t *cycle,
     ngx_conf_merge_value(conf->config.timeout,
         main_conf->config.timeout, 1000);
     ngx_conf_merge_value(conf->config.interval,
-        main_conf->config.interval, 10000);
+        main_conf->config.interval, 10);
     ngx_conf_merge_value(conf->config.passive,
         main_conf->config.passive, 0);
     ngx_conf_merge_str_value(conf->config.request_body,
