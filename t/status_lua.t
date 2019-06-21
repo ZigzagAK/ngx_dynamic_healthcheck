@@ -11,6 +11,7 @@ __DATA__
 
 === TEST 1: healthcheck status http lua
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -116,6 +117,7 @@ u2 127.0.0.6:6006 1 0
 
 === TEST 2: healthcheck status stream lua
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen 6002;
@@ -210,6 +212,7 @@ u2 127.0.0.6:6006 1 0
 
 === TEST 3: upstream not found
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -229,6 +232,8 @@ upstream not found
 
 
 === TEST 4: stream upstream not found
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;

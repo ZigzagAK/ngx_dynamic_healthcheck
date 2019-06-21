@@ -11,6 +11,7 @@ __DATA__
 
 === TEST 1: healthcheck http lua
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -75,6 +76,8 @@ bbb=666
 
 
 === TEST 2: healthcheck stream lua
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;
@@ -120,6 +123,7 @@ ping2 pong2
 
 === TEST 3: healthcheck http tcp lua
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -148,6 +152,7 @@ u1 tcp 2 1 1500 60
 
 === TEST 4: healthcheck http ssl lua
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -175,6 +180,8 @@ u1 ssl 2 1 1500 60
 
 
 === TEST 5: healthcheck stream tcp lua
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;
@@ -205,6 +212,8 @@ u1 tcp 2 1 1500 60
 
 
 === TEST 6: healthcheck stream ssl lua
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;
@@ -236,6 +245,7 @@ u1 ssl 2 1 1500 60
 
 === TEST 7: no healthcheck
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -255,6 +265,8 @@ no healthcheck
 
 
 === TEST 8: stream no healthcheck
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;
@@ -278,6 +290,7 @@ no healthcheck
 
 === TEST 9: healthcheck + no healthcheck
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -311,6 +324,8 @@ tcp
 
 
 === TEST 10: stream healthcheck + no healthcheck
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;
@@ -348,6 +363,7 @@ tcp
 
 === TEST 11: upstream not found
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -367,6 +383,8 @@ upstream not found
 
 
 === TEST 12: stream upstream not found
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;

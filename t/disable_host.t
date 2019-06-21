@@ -12,6 +12,7 @@ __DATA__
 
 === TEST 1: healthcheck status http disable/enable
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -118,6 +119,7 @@ u1 127.0.0.2:6002 0 0
 
 === TEST 2: healthcheck status http lua disable/enable in all upstreams
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -219,6 +221,7 @@ u2 127.0.0.1:6001
 
 === TEST 3: healthcheck status http disable/enable upstream
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -311,6 +314,7 @@ u2 0
         check_response_body pong;
     }
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen 6002;
@@ -420,6 +424,7 @@ u1 127.0.0.2:6002 0 0
         check_response_body pong;
     }
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen 6002;
@@ -515,6 +520,7 @@ u2 127.0.0.1:6001
         check_response_body pong;
     }
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen 6002;

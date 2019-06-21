@@ -8,6 +8,7 @@ __DATA__
 
 === STEP 1: init
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -63,6 +64,8 @@ bbb=444
 
 
 === STEP 2: update
+--- http_config
+    lua_load_resty_core off;
 --- request
     GET /update?upstream=u1&fall=100&timeout=4000&interval=1&request_uri=/ping&request_method=POST&request_headers=a:1|b:2&request_body=ping&response_codes=400|500
 --- response_body chomp
@@ -70,6 +73,8 @@ updated
 
 
 === STEP 3: check
+--- http_config
+    lua_load_resty_core off;
 --- request
     GET /test
 --- response_body_like chomp
@@ -83,6 +88,7 @@ b=2
 
 === STEP 4: after hup
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;

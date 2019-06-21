@@ -11,6 +11,7 @@ __DATA__
 
 === TEST 1: healthcheck status http
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -120,6 +121,7 @@ u2 127.0.0.6:6006 1 0
 
 === TEST 2: healthcheck status stream
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen 6002;
@@ -233,6 +235,7 @@ u2 127.0.0.6:6006 1 0
       ngx.say("hello")
     }
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -283,6 +286,7 @@ u1 127.0.0.1:6001 0 1
 
 === TEST 4: healthcheck status stream HTTP
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen 6002;
@@ -395,6 +399,7 @@ u2 127.0.0.6:6006 1 0
 
 === TEST 5: healthcheck status stream HTTP another port
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       location /heartbeat {
@@ -467,6 +472,7 @@ u1 127.0.0.1:6000 0
       ngx.say("hello")
     }
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -534,6 +540,7 @@ u1 127.0.0.2:6001 1 0 1 0
       ngx.say("hello")
     }
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -602,6 +609,7 @@ u1 127.0.0.2:6001 1 0 1 0
       ngx.say("hello")
     }
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -654,6 +662,7 @@ u1 127.0.0.2:6001 1 0 1 0
 
 === TEST 9: healthcheck chunked
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -735,6 +744,7 @@ u1 127.0.0.1:6001 0 1
       ngx.say("hello")
     }
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -786,6 +796,7 @@ u1 127.0.0.2:6001 0 0 0 1
 
 === TEST 11: healthcheck Host header
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
