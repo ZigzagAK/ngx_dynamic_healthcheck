@@ -12,6 +12,7 @@ __DATA__
 
 === TEST 1: healthcheck http update
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001;
@@ -96,6 +97,8 @@ b=2
 
 
 === TEST 2: healthcheck stream update
+--- http_config
+    lua_load_resty_core off;
 --- stream_config
     upstream u1 {
         zone shm-u1 128k;

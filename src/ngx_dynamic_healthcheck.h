@@ -165,18 +165,38 @@ public:
 
 #define SCOPED_SLAB_LOCK(slab) scoped_slab_lock m(slab)
 
+
+ngx_inline ngx_str_t
+get_host(ngx_str_t *name)
+{
+    ngx_str_t  s = *name;
+    u_char    *c;
+
+    c = ngx_strlchr(name->data, name->data + name->len, ':');
+    if (c != NULL)
+        s.len = c - name->data;
+
+    return s;
+}
+
+
 ngx_inline ngx_flag_t
 ngx_peer_excluded(ngx_str_t *name,
     ngx_dynamic_healthcheck_conf_t *conf)
 {
     ngx_uint_t i;
+    ngx_str_t  host = get_host(name);
 
     SCOPED_SLAB_LOCK(conf->peers.shared->slab);
 
     for (i = 0; i < conf->shared->excluded_hosts.len; i++) {
-        if (name->len >= conf->shared->excluded_hosts.data[i].len &&
-            ngx_memcmp(name->data, conf->shared->excluded_hosts.data[i].data,
-                       conf->shared->excluded_hosts.data[i].len) == 0)
+        if (ngx_memn2cmp(host.data, conf->shared->excluded_hosts.data[i].data,
+                         host.len, conf->shared->excluded_hosts.data[i].len)
+                == 0)
+            return 1;
+        if (ngx_memn2cmp(name->data, conf->shared->excluded_hosts.data[i].data,
+                         name->len, conf->shared->excluded_hosts.data[i].len)
+                == 0)
             return 1;
     }
 
@@ -196,12 +216,15 @@ ngx_peer_disabled(ngx_str_t *name,
         conf->shared->disabled_hosts_manual
     };
     ngx_uint_t i, j;
+    ngx_str_t  host = get_host(name);
 
     for (j = 0; j < sizeof(hosts) / sizeof(hosts[1]); j++) {
         for (i = 0; i < hosts[j].len; i++) {
-            if (name->len >= hosts[j].data[i].len &&
-                ngx_memcmp(name->data, hosts[j].data[i].data,
-                           hosts[j].data[i].len) == 0)
+            if (ngx_memn2cmp(host.data, hosts[j].data[i].data,
+                             host.len, hosts[j].data[i].len) == 0)
+                return 1;
+            if (ngx_memn2cmp(name->data, hosts[j].data[i].data,
+                             name->len, hosts[j].data[i].len) == 0)
                 return 1;
         }
     }

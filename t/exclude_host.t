@@ -11,6 +11,7 @@ __DATA__
 
 === TEST 1: check exclude_host http
 --- http_config
+    lua_load_resty_core off;
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
@@ -120,6 +121,7 @@ u3 unix:/tmp/u1.sock 1 1
 --- stream_server_config
     proxy_pass u1;
 --- http_config
+    lua_load_resty_core off;
     server {
       listen 6001;
       listen unix:/tmp/u1.sock;
