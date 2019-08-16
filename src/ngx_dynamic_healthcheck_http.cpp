@@ -179,25 +179,39 @@ healthcheck_http_helper::receive_data(ngx_dynamic_hc_local_node_t *state)
     else
         size = c->recv(c, buf->last, remains);
 
-    eof = c->read->pending_eof || c->read->eof;
+    eof = c->read->eof;
 
     ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
                   "[%V] %V: %V addr=%V, "
-                  "fd=%d http on_recv() recv: %d, eof=%d",
-                  &module, &upstream, &server, &name, c->fd, size, eof);
+                  "fd=%d http on_recv() recv: %d, eof=%d, pending_eof=%d",
+                  &module, &upstream, &server, &name, c->fd, size, eof,
+                  c->read->pending_eof);
 
-    if (size == NGX_ERROR)
-        return eof ? NGX_OK : NGX_ERROR;
+    if (size == NGX_ERROR) {
+
+        if (c->read->pending_eof) {
+
+            eof = 1;
+            return NGX_OK;
+        }
+
+        return NGX_ERROR;
+    }
 
     if (size == NGX_AGAIN)
         return NGX_AGAIN;
 
-    if (size == 0)
-        return eof ? NGX_DECLINED : NGX_AGAIN;
-
     buf->last += size;
 
-    return eof ? NGX_OK : NGX_DONE;
+    if (eof) {
+
+        if (size == 0)
+            return NGX_DECLINED;
+
+        return NGX_OK;
+    }
+
+    return NGX_DONE;
 }
 
 
@@ -263,8 +277,9 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
 
             size = ngx_min(buf->last - buf->pos, remains);
 
-            ngx_memcpy(body.last, buf->pos, size);
-            body.last += size;
+            ngx_memcpy(body->last, buf->pos, size);
+
+            body->last += size;
             buf->pos += size;
 
             remains -= size;
@@ -280,8 +295,8 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
             return NGX_AGAIN;
         }
 
-        sep = (u_char *) ngx_strstr(buf->pos, CRLF);
-        if (sep == NULL) {
+        sep = ngx_strlchr(buf->pos, buf->last, CR);
+        if (sep == NULL || sep + 1 == buf->last) {
 
             if (eof) {
 
@@ -295,6 +310,15 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
             return NGX_AGAIN;
         }
 
+        if (*(sep + 1) != LF) {
+
+            ngx_log_error(NGX_LOG_WARN, c->log, 0,
+                          "[%V] %V: %V addr=%V, fd=%d http "
+                          "invalid chunked response",
+                          &module, &upstream, &server, &name, c->fd);
+            return NGX_ERROR;
+        }
+
         remains = ngx_hextoi(buf->pos, sep - buf->pos);
         if (remains < 0) {
 
@@ -305,11 +329,8 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
             return NGX_ERROR;
         }
 
-        if (remains == 0) {
-
-            *body.last = 0;
+        if (remains == 0)
             return NGX_OK;
-        }
 
         ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
                       "[%V] %V: %V addr=%V, fd=%d http"
@@ -317,7 +338,7 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
                       &module, &upstream, &server, &name, c->fd,
                       remains);
 
-        if (remains > body.end - body.last - 1) {
+        if (remains > body->end - body->last) {
 
             ngx_log_error(NGX_LOG_WARN, c->log, 0,
                           "[%V] %V: %V addr=%V, fd=%d "
@@ -340,29 +361,33 @@ healthcheck_http_helper::parse_body(ngx_dynamic_hc_local_node_t *state)
     if (chunked)
         return parse_body_chunked(state);
 
-    ngx_memcpy(body.last, buf->pos, buf->last - buf->pos);
-    body.last += buf->last - buf->pos;
+    if (body->end - body->last < buf->last - buf->pos) {
+
+        ngx_log_error(NGX_LOG_WARN, c->log, 0,
+                      "[%V] %V: %V addr=%V, fd=%d "
+                      "healthcheck_buffer_size too small for read body",
+                      &module, &upstream, &server, &name, c->fd);
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(body->last, buf->pos, buf->last - buf->pos);
+
+    body->last += buf->last - buf->pos;
     buf->pos = buf->last = buf->start;
 
     if (content_length > 0) {
 
-        remains = content_length - (body.last - body.start);
+        remains = content_length - (body->last - body->start);
 
-        if (remains == 0) {
-
-            *body.last = 0;
+        if (remains == 0)
             return NGX_OK;
-        }
     }
 
     if (!eof)
         return NGX_AGAIN;
 
-    if (remains == 0) {
-
-        *body.last = 0;
+    if (remains == 0)
         return NGX_OK;
-    }
 
     ngx_log_error(NGX_LOG_WARN, c->log, 0,
                   "[%V] %V: %V addr=%V, fd=%d http"
@@ -379,6 +404,13 @@ healthcheck_http_helper::receive_body(ngx_dynamic_healthcheck_opts_t *shared,
 {
     ngx_connection_t  *c = state->pc.connection;
 
+    if (status.code == NGX_HTTP_NO_CONTENT)
+        return NGX_OK;
+
+    ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                  "[%V] %V: %V addr=%V, fd=%d http receive_body()",
+                  &module, &upstream, &server, &name, c->fd);
+
     if (content_length != -1 && chunked) {
 
         ngx_log_error(NGX_LOG_WARN, c->log, 0,
@@ -388,7 +420,7 @@ healthcheck_http_helper::receive_body(ngx_dynamic_healthcheck_opts_t *shared,
         return NGX_ERROR;
     }
 
-    if (body.start != NULL)
+    if (body != NULL)
         goto receive;
 
     if (!chunked) {
@@ -398,16 +430,6 @@ healthcheck_http_helper::receive_body(ngx_dynamic_healthcheck_opts_t *shared,
 
         if (content_length != -1)
             remains = content_length;
-
-        if ((size_t) remains > shared->buffer_size - 1) {
-
-            ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                          "[%V] %V: %V addr=%V, fd=%d http "
-                          "healthcheck_buffer_size too small"
-                          " for read body",
-                          &module, &upstream, &server, &name, c->fd);
-            return NGX_ERROR;
-        }
     }
 
     pool = ngx_create_pool(1024, c->log);
@@ -420,8 +442,8 @@ healthcheck_http_helper::receive_body(ngx_dynamic_healthcheck_opts_t *shared,
         return NGX_ERROR;
     }
 
-    body.start = (u_char *) ngx_palloc(pool, shared->buffer_size);
-    if (body.start == NULL) {
+    body = ngx_create_temp_buf(pool, shared->buffer_size);
+    if (body == NULL) {
 
         ngx_log_error(NGX_LOG_WARN, c->log, 0,
                       "[%V] %V: %V addr=%V, fd=%d http receiving body: "
@@ -429,9 +451,6 @@ healthcheck_http_helper::receive_body(ngx_dynamic_healthcheck_opts_t *shared,
                       &module, &upstream, &server, &name, c->fd);
         return NGX_ERROR;
     }
-
-    body.pos = body.last = body.start;
-    body.end = body.start + shared->buffer_size;
 
 receive:
 
@@ -473,6 +492,10 @@ healthcheck_http_helper::receive_headers(ngx_dynamic_healthcheck_opts_t *shared,
     ngx_dynamic_hc_local_node_t *state)
 {
     ngx_connection_t  *c = state->pc.connection;
+
+    ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
+                  "[%V] %V: %V addr=%V, fd=%d http receive_headers()",
+                  &module, &upstream, &server, &name, c->fd);
 
     for (;;) {
 
@@ -543,15 +566,15 @@ healthcheck_http_helper::receive(ngx_dynamic_healthcheck_opts_t *shared,
 {
     ngx_connection_t  *c = state->pc.connection;
     ngx_int_t          rc;
-    ngx_str_t          s;
+    ngx_str_t          s = { 0, NULL };
     ngx_uint_t         j;
 
     ngx_log_error(NGX_LOG_DEBUG, state->pc.connection->log, 0,
                   "[%V] %V: %V addr=%V, fd=%d http on_recv() %s",
                   &module, &upstream, &server, &name, c->fd,
-                  body.start == NULL ? "start" : "continue");
+                  body == NULL ? "start" : "continue");
 
-    if (body.start == NULL)
+    if (body == NULL)
         rc = receive_headers(shared, state);
     else
         rc = receive_body(shared, state);
@@ -560,9 +583,12 @@ healthcheck_http_helper::receive(ngx_dynamic_healthcheck_opts_t *shared,
         return rc;
 
     // response received
-    
-    s.data = body.start;
-    s.len = body.last - body.start;
+
+    if (body != NULL) {
+
+        s.data = body->start;
+        s.len = body->last - body->start;
+    }
 
     if (s.len) {
 

@@ -83,7 +83,7 @@ ngx_dynamic_healthcheck_create_local(ngx_str_t *server, ngx_str_t *name,
 
     ngx_snprintf(n->key.str.data, n->key.str.len, "%V/%V", name, server);
 
-    n->buf = ngx_create_temp_buf(pool, buffer_size);
+    n->buf = ngx_create_temp_buf(pool, buffer_size + ngx_pagesize);
     if (n->buf == NULL)
         goto nomem;
 

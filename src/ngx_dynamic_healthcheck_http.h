@@ -24,7 +24,7 @@ private:
     ngx_int_t           content_length;
     ngx_flag_t          chunked;
     ngx_flag_t          eof;
-    ngx_buf_t           body;
+    ngx_buf_t          *body;
     ngx_pool_t         *pool;
 
 private:
@@ -57,7 +57,6 @@ public:
 
         ngx_memzero(&r, sizeof(ngx_http_request_t));
         ngx_memzero(&status, sizeof(ngx_http_status_t));
-        ngx_memzero(&body, sizeof(ngx_buf_t));
     }
 
     ngx_int_t make_request(ngx_dynamic_healthcheck_opts_t *shared,
