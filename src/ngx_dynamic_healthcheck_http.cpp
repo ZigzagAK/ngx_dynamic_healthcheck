@@ -179,7 +179,7 @@ healthcheck_http_helper::receive_data(ngx_dynamic_hc_local_node_t *state)
     else
         size = c->recv(c, buf->last, remains);
 
-    eof = c->read->pending_eof;
+    eof = c->read->pending_eof || c->read->eof;
 
     ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
                   "[%V] %V: %V addr=%V, "
@@ -192,8 +192,8 @@ healthcheck_http_helper::receive_data(ngx_dynamic_hc_local_node_t *state)
     if (size == NGX_AGAIN)
         return NGX_AGAIN;
 
-    if (size == 0 && eof)
-        return NGX_DECLINED;
+    if (size == 0)
+        return eof ? NGX_DECLINED : NGX_AGAIN;
 
     buf->last += size;
 

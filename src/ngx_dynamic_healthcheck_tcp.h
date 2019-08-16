@@ -131,6 +131,9 @@ protected:
             return NGX_ERROR;
         }
 
+        if (c->read->eof)
+            return NGX_ERROR;
+
         return NGX_AGAIN;
     }
 
