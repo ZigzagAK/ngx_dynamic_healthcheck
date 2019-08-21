@@ -789,7 +789,7 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
     if (upstream->not_found) {
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last,
-                                      "{"CRLF);
+                                      "{" CRLF);
         tab = with_tab;
     }
  
@@ -841,7 +841,7 @@ ngx_http_dynamic_healthcheck_get(ngx_http_request_t *r,
             out->buf->last--;
         }
         out->buf->last = ngx_snprintf(out->buf->last,
-                                      out->buf->end - out->buf->last, "}"CRLF);
+                                      out->buf->end - out->buf->last, "}" CRLF);
     }
 
 skip:
@@ -849,7 +849,7 @@ skip:
     if (umcf == NULL || umcf->upstreams.nelts == 0)
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last,
-                                      "{}"CRLF);
+                                      "{}" CRLF);
 
     out->buf->last_buf = (r == r->main) ? 1: 0;
     out->buf->last_in_chain = 1;
@@ -1318,7 +1318,7 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
     if (upstream->not_found) {
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last,
-                                      "{"CRLF);
+                                      "{" CRLF);
         tab = with_tab;
     }
 
@@ -1370,7 +1370,7 @@ ngx_http_dynamic_healthcheck_status(ngx_http_request_t *r,
             out->buf->last--;
         }
         out->buf->last = ngx_snprintf(out->buf->last,
-                                      out->buf->end - out->buf->last, "}"CRLF);
+                                      out->buf->end - out->buf->last, "}" CRLF);
     }
 
 skip:
@@ -1378,7 +1378,7 @@ skip:
     if (umcf == NULL || umcf->upstreams.nelts == 0)
         out->buf->last = ngx_snprintf(out->buf->last,
                                       out->buf->end - out->buf->last,
-                                      "{}"CRLF);
+                                      "{}" CRLF);
 
     out->buf->last_buf = (r == r->main) ? 1: 0;
     out->buf->last_in_chain = 1;
