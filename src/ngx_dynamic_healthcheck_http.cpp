@@ -44,7 +44,7 @@ healthcheck_http_helper::make_request(ngx_dynamic_healthcheck_opts_t *shared,
         is_unix_socket ? 0 : 1);
 
     buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
-        "User-Agent: nginx/"NGINX_VERSION"\r\n"
+        "User-Agent: nginx/" NGINX_VERSION "\r\n"
         "Connection: %s\r\n",
         keepalive > c->requests + 1 ? "keep-alive" : "close");
 
