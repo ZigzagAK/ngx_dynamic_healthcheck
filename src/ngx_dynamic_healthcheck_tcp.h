@@ -73,10 +73,10 @@ protected:
 
         ngx_log_error(NGX_LOG_DEBUG, c->log, 0,
                       "[%V] %V: %V addr=%V, "
-                      "fd=%d on_recv() recv: %d",
+                      "fd=%d on_recv() recv: %d, eof=%d, pending_eof=%d",
                       &this->module, &this->upstream,
                       &this->server, &this->name, c->fd,
-                      size);
+                      size, c->read->eof, c->read->pending_eof);
 
         if (size == NGX_ERROR)
             return NGX_ERROR;
@@ -130,6 +130,9 @@ protected:
                           &shared->response_body);
             return NGX_ERROR;
         }
+
+        if (c->read->eof)
+            return NGX_ERROR;
 
         return NGX_AGAIN;
     }

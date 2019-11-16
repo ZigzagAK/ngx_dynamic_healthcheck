@@ -675,8 +675,10 @@ ngx_dynamic_healthcheck_match_buffer(ngx_str_t *pattern, ngx_str_t *s)
 
     ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
-    if (s->data == NULL)
+    if (s->data == NULL) {
+        s->len = 0;
         s->data = (u_char *) "";
+    }
 
     rc.pattern = *pattern;
     rc.err.len = NGX_MAX_CONF_ERRSTR;

@@ -15,7 +15,7 @@ __DATA__
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
-        server unix:/tmp/u1.sock down;
+        server unix:/tmp/e1.sock down;
         check type=http fall=2 rise=1 timeout=1500 interval=1;
         check_request_uri GET /heartbeat;
         check_response_codes 200 201 204;
@@ -23,16 +23,16 @@ __DATA__
     upstream u2 {
         zone shm-u2 128k;
         server 127.0.0.1:6001 down;
-        server unix:/tmp/u1.sock;
+        server unix:/tmp/e1.sock;
         check type=http fall=2 rise=1 timeout=1500 interval=1;
         check_request_uri GET /heartbeat;
         check_response_codes 200 201 204;
-        check_exclude_host unix:logs/u1.sock;
+        check_exclude_host unix:logs/e1.sock;
     }
     upstream u3 {
         zone shm-u3 128k;
         server 127.0.0.1:6001 down;
-        server unix:/tmp/u1.sock down;
+        server unix:/tmp/e1.sock down;
         check type=http fall=2 rise=1 timeout=1500 interval=1;
         check_request_uri GET /heartbeat;
         check_response_body xxx;
@@ -40,7 +40,7 @@ __DATA__
     }
     server {
       listen 6001;
-      listen unix:/tmp/u1.sock;
+      listen unix:/tmp/e1.sock;
       location /heartbeat {
         content_by_lua_block {
           ngx.say("pong")
@@ -84,11 +84,11 @@ __DATA__
     GET /test
 --- response_body_like
 u1 127.0.0.1:6001 0 1
-u1 unix:/tmp/u1.sock 0 1
+u1 unix:/tmp/e1.sock 0 1
 u2 127.0.0.1:6001 0 1
-u2 unix:/tmp/u1.sock 0 1
+u2 unix:/tmp/e1.sock 0 1
 u3 127.0.0.1:6001 1 1
-u3 unix:/tmp/u1.sock 1 1
+u3 unix:/tmp/e1.sock 1 1
 
 
 === TEST 2: check exclude_host stream
@@ -96,7 +96,7 @@ u3 unix:/tmp/u1.sock 1 1
     upstream u1 {
         zone shm-u1 128k;
         server 127.0.0.1:6001 down;
-        server unix:/tmp/u1.sock down;
+        server unix:/tmp/e1.sock down;
         check fall=2 rise=1 timeout=1500 interval=1;
         check_request_body "GET /heartbeat HTTP/1.0\r\nConnection: close;\r\n\r\n";
         check_response_body pong;
@@ -104,16 +104,16 @@ u3 unix:/tmp/u1.sock 1 1
     upstream u2 {
         zone shm-u2 128k;
         server 127.0.0.1:6001 down;
-        server unix:/tmp/u1.sock;
+        server unix:/tmp/e1.sock;
         check fall=2 rise=1 timeout=1500 interval=1;
         check_request_body "GET /heartbeat HTTP/1.0\r\nConnection: close;\r\n\r\n";
         check_response_body pong;
-        check_exclude_host unix:logs/u1.sock;
+        check_exclude_host unix:logs/e1.sock;
     }
     upstream u3 {
         zone shm-u3 128k;
         server 127.0.0.1:6001 down;
-        server unix:/tmp/u1.sock down;
+        server unix:/tmp/e1.sock down;
         check fall=2 rise=1 timeout=1500 interval=1;
         check_request_body "GET /heartbeat HTTP/1.0\r\nConnection: close;\r\n\r\n";
         check_response_body xxx;
@@ -124,7 +124,7 @@ u3 unix:/tmp/u1.sock 1 1
     lua_load_resty_core off;
     server {
       listen 6001;
-      listen unix:/tmp/u1.sock;
+      listen unix:/tmp/e1.sock;
       location /heartbeat {
         content_by_lua_block {
           ngx.say("pong")
@@ -168,8 +168,8 @@ u3 unix:/tmp/u1.sock 1 1
     GET /test
 --- response_body_like
 u1 127.0.0.1:6001 0 1
-u1 unix:/tmp/u1.sock 0 1
+u1 unix:/tmp/e1.sock 0 1
 u2 127.0.0.1:6001 0 1
-u2 unix:/tmp/u1.sock 0 1
+u2 unix:/tmp/e1.sock 0 1
 u3 127.0.0.1:6001 1 1
-u3 unix:/tmp/u1.sock 1 1
+u3 unix:/tmp/e1.sock 1 1
