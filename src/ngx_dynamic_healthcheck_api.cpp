@@ -337,7 +337,7 @@ ngx_dynamic_healthcheck_api_base::healthcheck_push(lua_State *L,
     }
 
     if (opts->passive) {
-        lua_pushboolean(L, opts->port);
+        lua_pushboolean(L, opts->passive);
         lua_setfield(L, -2, "passive");
     }
 
