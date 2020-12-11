@@ -1000,3 +1000,65 @@ u1 127.0.0.2:6001 0 0 0 1
     GET /test
 --- response_body_like
 u1 127.0.0.1:6001 0 1 0 1
+
+
+=== TEST 24: healthcheck chunked (no body)
+--- stream_config
+    server {
+      listen 6001;
+      content_by_lua_block {
+        ngx.print("HTTP/1.0 200 OK\r\n")
+        ngx.print("Server: nginx/1.13.12\r\n")
+        ngx.print("Transfer-Encoding: chunked\r\n\r\n")
+      }
+    }
+--- stream_server_config
+    content_by_lua_block {
+      ngx.say("hello")
+    }
+--- http_config
+    lua_load_resty_core off;
+    upstream u1 {
+        zone shm-u1 128k;
+        server 127.0.0.1:6001 down;
+        check type=http fall=2 rise=1 timeout=5000 interval=1 keepalive=10;
+        check_request_uri GET /heartbeat;
+        check_request_headers aaa=1111111111 bbb=2222222222 ccc=3333333333;
+        check_response_codes 200 201 204;
+        check_response_body 1111111111\n2222222222\n3333333333\n;
+    }
+--- config
+    location /status {
+      healthcheck_status;
+    }
+    location /test {
+        content_by_lua_block {
+            ngx.sleep(2.5)
+            local resp = assert(ngx.location.capture("/status"))
+            if resp.status ~= ngx.HTTP_OK then
+              ngx.say(resp.status)
+            end
+            local cjson = require "cjson"
+            local data = cjson.decode(resp.body)
+            local t = {}
+            for u, h in pairs(data)
+            do
+              for p, s in pairs(h.primary)
+              do
+                table.insert(t, string.format("%s %s %d 1", u, p, s.down))
+              end
+            end
+            table.sort(t)
+            for i,l in ipairs(t)
+            do
+              ngx.say(l)
+              ngx.log(ngx.INFO, l)
+            end
+        }
+    }
+--- timeout: 3
+--- request
+    GET /test
+--- timeout: 3
+--- response_body_like
+u1 127.0.0.1:6001 1 1

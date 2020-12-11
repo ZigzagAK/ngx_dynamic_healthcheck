@@ -283,13 +283,21 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
             buf->pos += size;
 
             remains -= size;
-            if (remains > 0)
+            if (remains > 0) {
+
+                if (eof)
+                    break;
+
                 return NGX_AGAIN;
+            }
 
             buf->pos += 2;  // CRLF
         }
 
         if (buf->pos == buf->last) {
+
+            if (eof)
+                break;
 
             buf->pos = buf->last = buf->start;
             return NGX_AGAIN;
@@ -298,26 +306,14 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
         sep = ngx_strlchr(buf->pos, buf->last, CR);
         if (sep == NULL || sep + 1 == buf->last) {
 
-            if (eof) {
-
-                ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                              "[%V] %V: %V addr=%V, fd=%d http "
-                              "invalid chunked response",
-                              &module, &upstream, &server, &name, c->fd);
-                return NGX_ERROR;
-            }
+            if (eof)
+                break;
 
             return NGX_AGAIN;
         }
 
-        if (*(sep + 1) != LF) {
-
-            ngx_log_error(NGX_LOG_WARN, c->log, 0,
-                          "[%V] %V: %V addr=%V, fd=%d http "
-                          "invalid chunked response",
-                          &module, &upstream, &server, &name, c->fd);
-            return NGX_ERROR;
-        }
+        if (*(sep + 1) != LF)
+            break;
 
         remains = ngx_hextoi(buf->pos, sep - buf->pos);
         if (remains < 0) {
@@ -349,6 +345,12 @@ healthcheck_http_helper::parse_body_chunked(ngx_dynamic_hc_local_node_t *state)
 
         buf->pos = sep + 2;  //CRLF after chunk size
     }
+
+    ngx_log_error(NGX_LOG_WARN, c->log, 0,
+                  "[%V] %V: %V addr=%V, fd=%d http "
+                  "invalid chunked response",
+                  &module, &upstream, &server, &name, c->fd);
+    return NGX_ERROR;
 }
 
 
