@@ -250,7 +250,7 @@ ngx_stream_dynamic_healthcheck_create_conf(ngx_conf_t *cf)
     conf->config.rise        = NGX_CONF_UNSET;
     conf->config.timeout     = NGX_CONF_UNSET_UINT;
     conf->config.interval    = NGX_CONF_UNSET;
-    conf->config.keepalive   = NGX_CONF_UNSET_UINT;
+    conf->config.keepalive   = 1;
     conf->config.buffer_size = NGX_CONF_UNSET_SIZE;
 
     return conf;
@@ -331,6 +331,7 @@ ngx_stream_dynamic_healthcheck_init_srv_conf(ngx_conf_t *cf,
         main_conf->config.timeout, 1000);
     ngx_conf_merge_value(conf->config.interval,
         main_conf->config.interval, 10);
+    conf->config.keepalive = 1;
     ngx_conf_merge_value(conf->config.passive,
         main_conf->config.passive, 0);
     ngx_conf_merge_str_value(conf->config.request_body,

@@ -467,11 +467,13 @@ ngx_dynamic_healthcheck_peer::set_keepalive()
     if (ngx_stopping())
         goto close;
 
-    ngx_log_debug7(NGX_LOG_DEBUG_HTTP, c->log, 0,
-                   "[%V] %V: %V addr=%V, fd=%d set_keepalive(),"
-                   " requests=%d of %d",
-                   &module, &upstream, &server, &name, c->fd,
-                   c->requests, opts->keepalive);
+    if (opts->keepalive > 1) {
+        ngx_log_debug7(NGX_LOG_DEBUG_HTTP, c->log, 0,
+                      "[%V] %V: %V addr=%V, fd=%d set_keepalive(),"
+                      " requests=%d of %d",
+                      &module, &upstream, &server, &name, c->fd,
+                      c->requests, opts->keepalive);
+    }
 
     if (c->error || c->requests >= opts->keepalive)
         goto close;
