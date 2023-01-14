@@ -28,11 +28,14 @@ healthcheck_http_helper::make_request(ngx_dynamic_healthcheck_opts_t *shared,
     ngx_connection_t                *c = state->pc.connection;
     ngx_uint_t                       i;
     ngx_str_t                        host;
+    ngx_str_t                        user_agent;
     ngx_flag_t                       is_unix_socket;
     ngx_uint_t                       keepalive = shared->keepalive;
     static ngx_str_t                 Host = ngx_string("Host");
+    static ngx_str_t                 UserAgent = ngx_string("User-Agent");
 
     ngx_str_null(&host);
+    ngx_str_null(&user_agent);
 
     is_unix_socket = state->server.len > 5
         && ngx_strncmp(state->server.data, "unix:", 5) == 0;
@@ -44,7 +47,6 @@ healthcheck_http_helper::make_request(ngx_dynamic_healthcheck_opts_t *shared,
         is_unix_socket ? 0 : 1);
 
     buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
-        "User-Agent: nginx/" NGINX_VERSION "\r\n"
         "Connection: %s\r\n",
         keepalive > c->requests + 1 ? "keep-alive" : "close");
 
@@ -54,11 +56,23 @@ healthcheck_http_helper::make_request(ngx_dynamic_healthcheck_opts_t *shared,
             host = shared->request_headers.data[i].value;
             continue;
         }
+        if (ngx_strncasecmp(UserAgent.data, shared->request_headers.data[i].key.data,
+                            shared->request_headers.data[i].key.len) == 0) {
+            user_agent = shared->request_headers.data[i].value;
+            continue;
+        }
         buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
             "%V: %V\r\n",
             &shared->request_headers.data[i].key,
             &shared->request_headers.data[i].value);
     }
+
+    if (user_agent.data != NULL)
+           buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+                           "User-Agent: %V\r\n", &user_agent);
+    else
+           buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
+                           "User-Agent: nginx/" NGINX_VERSION "\r\n");
 
     if (host.data != NULL) {
         buf->last = ngx_snprintf(buf->last, buf->end - buf->last,
