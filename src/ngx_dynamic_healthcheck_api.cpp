@@ -1176,7 +1176,11 @@ ngx_dynamic_healthcheck_api_base::parse(ngx_dynamic_healthcheck_conf_t *conf,
     rc.err.len = NGX_MAX_CONF_ERRSTR;
     rc.err.data = errstr;
     rc.pool = pool;
+#if (NGX_PCRE2)
+    rc.options = PCRE2_UNGREEDY;
+#else
     rc.options = PCRE_UNGREEDY;
+#endif
 
     rc.pattern = re;
 

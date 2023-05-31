@@ -211,7 +211,7 @@ function download() {
 
   download_module openresty   stream-lua-nginx-module          v0.0.6
   download_module simpl       ngx_devel_kit                    master
-  download_module openresty   lua-nginx-module                 v0.10.14
+  download_module openresty   lua-nginx-module                 v0.10.15
   download_module openresty   lua-cjson                        master
   download_module ZigzagAK    ngx_dynamic_upstream             master
   download_module openresty   echo-nginx-module                tags/v0.61

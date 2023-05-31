@@ -11,8 +11,8 @@ build_deps=0
 
 DIR="$(pwd)"
 
-VERSION="1.15.6"
-PCRE_VERSION="8.39"
+VERSION="1.24.0"
+PCRE2_VERSION="10.37"
 ZLIB_VERSION="1.2.11"
 
 SUFFIX=""
@@ -20,7 +20,7 @@ SUFFIX=""
 BASE_PREFIX="$DIR/build"
 INSTALL_PREFIX="$DIR/install"
 
-export PCRE_SOURCES="$DIR/build/pcre-$PCRE_VERSION"
+export PCRE_SOURCES="$DIR/build/pcre2-$PCRE2_VERSION"
 export ZLIB_SOURCES="$DIR/build/zlib-$ZLIB_VERSION"
 
 EMBEDDED_OPTS="--with-pcre=$PCRE_SOURCES --with-zlib=$ZLIB_SOURCES"
@@ -129,11 +129,11 @@ function download_nginx() {
 }
 
 function download_pcre() {
-  if [ $download -eq 1 ] || [ ! -e pcre-$PCRE_VERSION.tar.gz ]; then
-    echo "Download PCRE-$PCRE_VERSION"
-    curl -s -L -O http://ftp.cs.stanford.edu/pub/exim/pcre/pcre-$PCRE_VERSION.tar.gz
+  if [ $download -eq 1 ] || [ ! -e pcre2-$PCRE2_VERSION.tar.gz ]; then
+    echo "Download PCRE2-$PCRE2_VERSION"
+    curl -s -L -O http://ftp.cs.stanford.edu/pub/exim/pcre/pcre2-$PCRE2_VERSION.tar.gz
   else
-    echo "Get pcre-$PCRE_VERSION.tar.gz"
+    echo "Get pcre2-$PCRE2_VERSION.tar.gz"
   fi
 }
 
@@ -195,11 +195,11 @@ function install_files() {
 function build() {
   cd build
 
-# make clean > /dev/null 2>&1
-# build_debug
-
   make clean > /dev/null 2>&1
-  build_release
+  build_debug
+
+#  make clean > /dev/null 2>&1
+#  build_release
 
   cd ..
 }
