@@ -426,11 +426,13 @@ ngx_dynamic_healthcheck_peer::peek()
                    ngx_socket_errno, "[%V] %V: %V addr=%V, fd=%d peek(), rc=%d",
                    &module, &upstream, &server, &name, c->fd, rc);
 
-    if (rc == 1 || (rc == -1 && ngx_socket_errno == NGX_EAGAIN)) {
+    if (rc == 1)
+        return NGX_OK;
+
+    if (rc == -1 && ngx_socket_errno == NGX_EAGAIN) {
+        c->read->ready = 0;
         if (ngx_handle_read_event(c->read, 0) == NGX_OK)
             return NGX_OK;
-
-        return NGX_ERROR;
     }
 
     return NGX_ERROR;
@@ -544,6 +546,15 @@ connected:
     c->data = this;
 
     if (rc != NGX_AGAIN) {
+        if (test_connect(c) == NGX_ERROR) {
+            ngx_log_error(NGX_LOG_ERR, c->log, ngx_socket_errno,
+                        "[%V] %V: %V addr=%V, fd=%d connect error",
+                        &this->module, &this->upstream,
+                        &this->server, &this->name, c->fd);
+
+            this->fail();
+            return;
+        }
         check_state = st_connected;
         c->write->handler = &ngx_dynamic_healthcheck_peer::handle_write;
         c->read->handler = &ngx_dynamic_healthcheck_peer::handle_dummy;
