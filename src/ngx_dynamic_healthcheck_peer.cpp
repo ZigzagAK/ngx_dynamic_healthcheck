@@ -696,10 +696,8 @@ ngx_dynamic_healthcheck_match_buffer(ngx_str_t *pattern, ngx_str_t *s)
     rc.pattern = *pattern;
     rc.err.len = NGX_MAX_CONF_ERRSTR;
     rc.err.data = errstr;
-#if (NGX_PCRE2)
-    rc.options = PCRE2_DOTALL;
-#else
-    rc.options = PCRE_DOTALL;
+#ifdef NGX_REGEX_DOTALL
+    rc.options = NGX_REGEX_DOTALL;
 #endif
 
     rc.pool = ngx_create_pool(1024, ngx_cycle->log);
